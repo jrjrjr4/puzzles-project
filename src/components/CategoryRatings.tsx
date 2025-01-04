@@ -31,9 +31,9 @@ export default function CategoryRatings() {
 
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-medium text-orange-600 mb-3">Focus Areas</h3>
+          <h3 className="text-sm font-medium text-green-600 mb-3">Strengths</h3>
           <div className="grid grid-cols-1 gap-4">
-            {weakestCategories.map((category) => (
+            {strongestCategories.map((category) => (
               <CategoryCard
                 key={category.name}
                 category={{
@@ -47,9 +47,9 @@ export default function CategoryRatings() {
         </div>
 
         <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-sm font-medium text-green-600 mb-3">Strengths</h3>
+          <h3 className="text-sm font-medium text-orange-600 mb-3">Focus Areas</h3>
           <div className="grid grid-cols-1 gap-4">
-            {strongestCategories.map((category) => (
+            {weakestCategories.map((category) => (
               <CategoryCard
                 key={category.name}
                 category={{
