@@ -4,16 +4,58 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { createChessGame } from '../utils/chess';
 
+function formatMove(move: string): string {
+  return `${move.slice(0, 2)} → ${move.slice(2, 4)}`;
+}
+
 export default function Chessboard() {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
   const [game, setGame] = useState(createChessGame());
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
+  const [puzzleStatus, setPuzzleStatus] = useState<'ongoing' | 'correct' | 'incorrect'>('ongoing');
+  const [highlightedSquares, setHighlightedSquares] = useState<{ [square: string]: { backgroundColor: string } }>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(800);
 
-  // Update game when puzzle changes
+  // Get board orientation from FEN
+  const boardOrientation = game.turn() === 'w' ? 'white' : 'black';
+
+  // Update game when puzzle changes and show opponent's first move
   useEffect(() => {
-    if (currentPuzzle?.fen) {
-      setGame(createChessGame(currentPuzzle.fen));
+    try {
+      if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
+        console.log('Setting up new puzzle:', currentPuzzle);
+        const newGame = createChessGame(currentPuzzle.fen);
+        console.log('Initial position:', newGame.fen());
+        
+        // Make opponent's first move
+        const firstMove = currentPuzzle.moves[0];
+        const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
+        const moveResult = newGame.move({ from, to, promotion: 'q' });
+        console.log('Opponent first move:', moveResult);
+        console.log('Position after move:', newGame.fen());
+        
+        // Highlight the squares of opponent's move
+        setHighlightedSquares({
+          [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
+          [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+        });
+
+        setGame(newGame);
+        setCurrentMoveIndex(1);
+        setPuzzleStatus('ongoing');
+      } else {
+        // Reset to initial state if no puzzle
+        setGame(createChessGame());
+        setHighlightedSquares({});
+        setPuzzleStatus('ongoing');
+      }
+    } catch (error) {
+      console.error('Error setting up puzzle:', error);
+      // Reset to initial state on error
+      setGame(createChessGame());
+      setHighlightedSquares({});
+      setPuzzleStatus('ongoing');
     }
   }, [currentPuzzle]);
 
@@ -32,6 +74,8 @@ export default function Chessboard() {
 
   function onDrop(sourceSquare: string, targetSquare: string) {
     try {
+      if (!currentPuzzle || puzzleStatus !== 'ongoing') return false;
+
       const move = game.move({
         from: sourceSquare,
         to: targetSquare,
@@ -39,24 +83,120 @@ export default function Chessboard() {
       });
 
       if (move === null) return false;
-      setGame(createChessGame(game.fen()));
+
+      // Check if the move matches the expected puzzle move
+      const expectedMove = currentPuzzle.moves[currentMoveIndex];
+      const moveString = `${sourceSquare}${targetSquare}`;
+
+      if (moveString !== expectedMove) {
+        setPuzzleStatus('incorrect');
+        return true;
+      }
+
+      // If this was the last move, puzzle is complete
+      if (currentMoveIndex === currentPuzzle.moves.length - 1) {
+        setPuzzleStatus('correct');
+        return true;
+      }
+
+      // Make the opponent's next move
+      const opponentMove = currentPuzzle.moves[currentMoveIndex + 1];
+      const [from, to] = [opponentMove.slice(0, 2), opponentMove.slice(2, 4)];
+      const opponentMoveResult = game.move({
+        from,
+        to,
+        promotion: 'q',
+      });
+      console.log('Opponent move result:', opponentMoveResult);
+
+      // Highlight the squares of opponent's move
+      setHighlightedSquares({
+        [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
+        [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+      });
+
+      const newGame = createChessGame(game.fen());
+      console.log('Position after opponent move:', newGame.fen());
+      setGame(newGame);
+      setCurrentMoveIndex(currentMoveIndex + 2);
       return true;
     } catch (error) {
+      console.error('Move error:', error);
       return false;
     }
   }
 
+  function renderPuzzleSolution() {
+    if (!currentPuzzle) return null;
+    
+    const moves = currentPuzzle.moves;
+    const movesList = [];
+    
+    // Start with opponent's first move
+    movesList.push(
+      <div key="first" className="flex gap-2 text-sm">
+        <span className="text-gray-500">Initial:</span>
+        <span className="text-red-600">{formatMove(moves[0])}</span>
+      </div>
+    );
+    
+    // Then show the rest of the sequence
+    for (let i = 1; i < moves.length; i += 2) {
+      const moveNumber = Math.ceil(i / 2);
+      const playerMove = formatMove(moves[i]);
+      const opponentMove = i + 1 < moves.length ? formatMove(moves[i + 1]) : null;
+      
+      movesList.push(
+        <div key={i} className="flex gap-2 text-sm">
+          <span className="text-gray-500">{moveNumber}.</span>
+          <span className="text-blue-600">{playerMove}</span>
+          {opponentMove && (
+            <span className="text-red-600">{opponentMove}</span>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="mt-2 space-y-1">
+        <div className="text-sm font-medium text-gray-700">Correct sequence:</div>
+        {movesList}
+      </div>
+    );
+  }
+
   return (
-    <div ref={containerRef} className="w-full aspect-square">
-      <ReactChessboard
-        position={game.fen()}
-        onPieceDrop={onDrop}
-        boardWidth={boardWidth}
-        customBoardStyle={{
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        }}
-      />
+    <div className="space-y-4">
+      <div ref={containerRef} className="w-full aspect-square">
+        <ReactChessboard
+          position={game.fen()}
+          onPieceDrop={onDrop}
+          boardWidth={boardWidth}
+          boardOrientation={boardOrientation}
+          customSquareStyles={highlightedSquares}
+          customBoardStyle={{
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          }}
+        />
+      </div>
+      {!currentPuzzle && (
+        <div className="p-4 bg-blue-100 text-blue-800 rounded-lg text-center">
+          Click "Load Random Puzzle" to start solving!
+        </div>
+      )}
+      {puzzleStatus !== 'ongoing' && (
+        <div className={`p-4 rounded-lg ${
+          puzzleStatus === 'correct' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          <div className="text-center font-semibold">
+            {puzzleStatus === 'correct' ? 'Puzzle Solved!' : 'Incorrect Move'}
+          </div>
+          {puzzleStatus === 'incorrect' && renderPuzzleSolution()}
+        </div>
+      )}
     </div>
   );
 }
