@@ -3,6 +3,7 @@ import { Chessboard as ReactChessboard } from 'react-chessboard';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { createChessGame } from '../utils/chess';
+import { Square, Piece } from 'react-chessboard/dist/chessboard/types';
 
 function formatMove(move: string): string {
   return `${move.slice(0, 2)} → ${move.slice(2, 4)}`;
@@ -14,49 +15,67 @@ export default function Chessboard() {
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [puzzleStatus, setPuzzleStatus] = useState<'ongoing' | 'correct' | 'incorrect'>('ongoing');
   const [highlightedSquares, setHighlightedSquares] = useState<{ [square: string]: { backgroundColor: string } }>({});
+  const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(800);
 
-  // Get board orientation from FEN
-  const boardOrientation = game.turn() === 'w' ? 'white' : 'black';
+  // Get board orientation from FEN - show the side to move at the bottom
+  const boardOrientation = currentPuzzle?.fen ? 
+    (currentPuzzle.fen.split(' ')[1] === 'w' ? 'black' : 'white') : 
+    'white';
 
   // Update game when puzzle changes and show opponent's first move
   useEffect(() => {
-    try {
-      if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
-        console.log('Setting up new puzzle:', currentPuzzle);
-        const newGame = createChessGame(currentPuzzle.fen);
-        console.log('Initial position:', newGame.fen());
-        
-        // Make opponent's first move
-        const firstMove = currentPuzzle.moves[0];
-        const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
-        const moveResult = newGame.move({ from, to, promotion: 'q' });
-        console.log('Opponent first move:', moveResult);
-        console.log('Position after move:', newGame.fen());
-        
-        // Highlight the squares of opponent's move
-        setHighlightedSquares({
-          [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
-          [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
-        });
+    async function setupPuzzle() {
+      try {
+        if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
+          console.log('Setting up new puzzle:', currentPuzzle);
+          const newGame = createChessGame(currentPuzzle.fen);
+          console.log('Initial position:', newGame.fen());
+          
+          // Set initial position without animation
+          setGame(newGame);
+          setHighlightedSquares({});
+          setCurrentMoveIndex(1);
+          setPuzzleStatus('ongoing');
+          
+          // Wait 1 second before showing opponent's first move
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Make opponent's first move with animation
+          setIsAnimating(true);
+          const firstMove = currentPuzzle.moves[0];
+          const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
+          const moveResult = newGame.move({ from, to, promotion: 'q' });
+          console.log('Opponent first move:', moveResult);
+          console.log('Position after move:', newGame.fen());
+          
+          // Highlight the squares of opponent's move
+          setHighlightedSquares({
+            [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
+            [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+          });
 
-        setGame(newGame);
-        setCurrentMoveIndex(1);
-        setPuzzleStatus('ongoing');
-      } else {
-        // Reset to initial state if no puzzle
+          setGame(newGame);
+          setIsAnimating(false);
+        } else {
+          // Reset to initial state if no puzzle
+          setGame(createChessGame());
+          setHighlightedSquares({});
+          setPuzzleStatus('ongoing');
+          setIsAnimating(false);
+        }
+      } catch (error) {
+        console.error('Error setting up puzzle:', error);
+        // Reset to initial state on error
         setGame(createChessGame());
         setHighlightedSquares({});
         setPuzzleStatus('ongoing');
+        setIsAnimating(false);
       }
-    } catch (error) {
-      console.error('Error setting up puzzle:', error);
-      // Reset to initial state on error
-      setGame(createChessGame());
-      setHighlightedSquares({});
-      setPuzzleStatus('ongoing');
     }
+    
+    setupPuzzle();
   }, [currentPuzzle]);
 
   useEffect(() => {
@@ -72,10 +91,10 @@ export default function Chessboard() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  function onDrop(sourceSquare: string, targetSquare: string) {
-    try {
-      if (!currentPuzzle || puzzleStatus !== 'ongoing') return false;
+  function onDrop(sourceSquare: Square, targetSquare: Square, piece: Piece): boolean {
+    if (!currentPuzzle || puzzleStatus !== 'ongoing' || isAnimating) return false;
 
+    try {
       const move = game.move({
         from: sourceSquare,
         to: targetSquare,
@@ -100,28 +119,34 @@ export default function Chessboard() {
       }
 
       // Make the opponent's next move
-      const opponentMove = currentPuzzle.moves[currentMoveIndex + 1];
-      const [from, to] = [opponentMove.slice(0, 2), opponentMove.slice(2, 4)];
-      const opponentMoveResult = game.move({
-        from,
-        to,
-        promotion: 'q',
-      });
-      console.log('Opponent move result:', opponentMoveResult);
+      setIsAnimating(true);
+      setTimeout(() => {
+        const opponentMove = currentPuzzle.moves[currentMoveIndex + 1];
+        const [from, to] = [opponentMove.slice(0, 2), opponentMove.slice(2, 4)];
+        const opponentMoveResult = game.move({
+          from,
+          to,
+          promotion: 'q',
+        });
+        console.log('Opponent move result:', opponentMoveResult);
 
-      // Highlight the squares of opponent's move
-      setHighlightedSquares({
-        [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
-        [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
-      });
+        // Highlight the squares of opponent's move
+        setHighlightedSquares({
+          [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
+          [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+        });
 
-      const newGame = createChessGame(game.fen());
-      console.log('Position after opponent move:', newGame.fen());
-      setGame(newGame);
-      setCurrentMoveIndex(currentMoveIndex + 2);
+        const newGame = createChessGame(game.fen());
+        console.log('Position after opponent move:', newGame.fen());
+        setGame(newGame);
+        setCurrentMoveIndex(currentMoveIndex + 2);
+        setIsAnimating(false);
+      }, 4000); // Match the animation duration
+
       return true;
     } catch (error) {
       console.error('Move error:', error);
+      setIsAnimating(false);
       return false;
     }
   }
@@ -174,11 +199,23 @@ export default function Chessboard() {
           boardWidth={boardWidth}
           boardOrientation={boardOrientation}
           customSquareStyles={highlightedSquares}
+          animationDuration={isAnimating ? 4000 : 0}
           customBoardStyle={{
             borderRadius: '8px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         />
+      </div>
+      <div className="flex justify-between items-center">
+        <div className="text-sm font-medium">
+          {isAnimating ? (
+            <span className="text-blue-600">Opponent is moving...</span>
+          ) : (
+            <span className={game.turn() === 'w' ? 'text-gray-800' : 'text-gray-800'}>
+              {game.turn() === 'w' ? 'White' : 'Black'} to move
+            </span>
+          )}
+        </div>
       </div>
       {!currentPuzzle && (
         <div className="p-4 bg-blue-100 text-blue-800 rounded-lg text-center">
