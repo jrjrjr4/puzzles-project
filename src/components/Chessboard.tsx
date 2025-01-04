@@ -6,9 +6,16 @@ import { createChessGame } from '../utils/chess';
 
 export default function Chessboard() {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
-  const [game, setGame] = useState(createChessGame(currentPuzzle?.fen));
+  const [game, setGame] = useState(createChessGame());
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(800);
+
+  // Update game when puzzle changes
+  useEffect(() => {
+    if (currentPuzzle?.fen) {
+      setGame(createChessGame(currentPuzzle.fen));
+    }
+  }, [currentPuzzle]);
 
   useEffect(() => {
     const updateDimensions = () => {
