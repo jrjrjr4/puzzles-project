@@ -13,9 +13,15 @@ function formatMove(move: string): string {
 // Define a consistent highlight color
 const HIGHLIGHT_COLOR = { backgroundColor: 'rgba(134, 239, 172, 0.4)' }; // Light green with transparency
 
+function formatRatingChange(oldRating: number, newRating: number): string {
+  const change = Math.round(newRating - oldRating);
+  const sign = change >= 0 ? '+' : '';
+  return `${Math.round(oldRating)} → ${Math.round(newRating)} (${sign}${change})`;
+}
+
 export default function Chessboard() {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
-  const [game, setGame] = useState(createChessGame());
+  const [game, setGame] = useState(() => createChessGame());
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [puzzleStatus, setPuzzleStatus] = useState<'ongoing' | 'correct' | 'incorrect'>('ongoing');
   const [highlightedSquares, setHighlightedSquares] = useState<{ [square: string]: { backgroundColor: string } }>({});
@@ -36,39 +42,51 @@ export default function Chessboard() {
     async function setupPuzzle() {
       try {
         if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
-          // First, set up the initial position with no animation
+          // Disable animations initially
           setTransitionDuration(0);
+          setIsAnimating(false);
+          
+          // Create new game and set position immediately
           const newGame = createChessGame(currentPuzzle.fen);
           setGame(newGame);
+          
+          // Clear any existing highlights
           setHighlightedSquares({});
-          setCurrentMoveIndex(1);
           setPuzzleStatus('ongoing');
-          
-          // Wait a brief moment to ensure the initial position is set
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Then set up the animation for the opponent's first move
-          const firstMove = currentPuzzle.moves[0];
-          const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
-          
-          // Set the animation duration for the piece movement (reduced from 800ms to 600ms)
-          setTransitionDuration(600);
-          
-          // Keep the 1.5 second wait before the move
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // Make opponent's first move with animation
-          setIsAnimating(true);
-          const moveResult = newGame.move({ from, to, promotion: 'q' });
-          
-          // Highlight the squares of opponent's move
-          setHighlightedSquares({
-            [from]: HIGHLIGHT_COLOR,
-            [to]: HIGHLIGHT_COLOR
-          });
+          setCurrentMoveIndex(1);
 
-          setGame(newGame);
-          setIsAnimating(false);
+          // Re-enable animations after a brief delay
+          setTimeout(() => {
+            setTransitionDuration(300);
+            
+            // Show opponent's first move
+            const firstMove = currentPuzzle.moves[0];
+            const from = firstMove.slice(0, 2);
+            const to = firstMove.slice(2, 4);
+            
+            // Highlight the move
+            setHighlightedSquares({
+              [from]: HIGHLIGHT_COLOR,
+              [to]: HIGHLIGHT_COLOR
+            });
+
+            // Make the move
+            setIsAnimating(true);
+            const moveResult = newGame.move({
+              from,
+              to,
+              promotion: firstMove.length > 4 ? firstMove[4] : undefined
+            });
+
+            if (moveResult) {
+              setGame(newGame);
+            }
+
+            // Clear animation state after move
+            setTimeout(() => {
+              setIsAnimating(false);
+            }, 300);
+          }, 50);
         } else {
           // Reset to initial state if no puzzle
           setTransitionDuration(0);
@@ -85,7 +103,7 @@ export default function Chessboard() {
         setIsAnimating(false);
       }
     }
-    
+
     setupPuzzle();
   }, [currentPuzzle]);
 
@@ -162,7 +180,7 @@ export default function Chessboard() {
         setGame(newGame);
         setCurrentMoveIndex(currentMoveIndex + 2);
         setIsAnimating(false);
-      }, 5000); // Increased from 4000 to 5000ms for a longer delay
+      }, 1000); // Changed from 5000 to 1000ms for a 1 second delay
 
       return true;
     } catch (error) {
@@ -215,44 +233,26 @@ export default function Chessboard() {
     if (!lastRatingUpdates) return null;
 
     return (
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg text-sm font-mono">
-        <h3 className="font-medium mb-2 text-gray-700">Rating Updates:</h3>
-        
-        {/* Overall Rating */}
-        <div className="mb-3">
-          <div className="font-medium text-blue-600">Overall:</div>
-          <div className="ml-4">
-            {lastRatingUpdates.overall.oldRating} → {lastRatingUpdates.overall.newRating}
-            <span className="text-gray-500 ml-2">
-              ({lastRatingUpdates.overall.change > 0 ? '+' : ''}{lastRatingUpdates.overall.change})
+      <div className="p-4 bg-gray-100 rounded-lg space-y-2">
+        <div className="font-medium text-gray-700">Rating Updates:</div>
+        <div className="space-y-1">
+          <div className="flex justify-between text-sm">
+            <span>Overall:</span>
+            <span className="font-medium">
+              {formatRatingChange(
+                lastRatingUpdates.overall.oldRating,
+                lastRatingUpdates.overall.newRating
+              )}
             </span>
-            <div className="text-xs text-gray-500">
-              RD: {Math.round(lastRatingUpdates.overall.oldRD)} → {Math.round(lastRatingUpdates.overall.newRD)}
-            </div>
           </div>
-        </div>
-
-        {/* Category Updates */}
-        <div>
-          <div className="font-medium text-blue-600">Categories:</div>
-          {Object.entries(lastRatingUpdates.categories).length === 0 ? (
-            <div className="ml-4 text-gray-500">No categories updated</div>
-          ) : (
-            Object.entries(lastRatingUpdates.categories).map(([category, update]) => (
-              <div key={category} className="ml-4 mb-2">
-                <div className="font-medium">{category}:</div>
-                <div className="ml-2">
-                  {update.oldRating} → {update.newRating}
-                  <span className="text-gray-500 ml-2">
-                    ({update.change > 0 ? '+' : ''}{update.change})
-                  </span>
-                  <div className="text-xs text-gray-500">
-                    RD: {Math.round(update.oldRD)} → {Math.round(update.newRD)}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+          {Object.entries(lastRatingUpdates.categories).map(([theme, update]) => (
+            <div key={theme} className="flex justify-between text-sm">
+              <span>{theme}:</span>
+              <span className="font-medium">
+                {formatRatingChange(update.oldRating, update.newRating)}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     );

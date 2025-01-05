@@ -17,4 +17,11 @@ export interface PuzzleState {
     overall: number;
     categories: Record<string, number>;
   };
+}
+
+export interface RatingUpdate {
+  oldRating: number;
+  oldRD: number;
+  newRating: number;
+  newRD: number;
 } 
