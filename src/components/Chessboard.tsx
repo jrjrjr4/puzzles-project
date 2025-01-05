@@ -18,6 +18,7 @@ export default function Chessboard() {
   const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(800);
+  const [transitionDuration, setTransitionDuration] = useState(300);
 
   // Get board orientation from FEN - show the side to move at the bottom
   const boardOrientation = currentPuzzle?.fen ? 
@@ -29,26 +30,30 @@ export default function Chessboard() {
     async function setupPuzzle() {
       try {
         if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
-          console.log('Setting up new puzzle:', currentPuzzle);
+          // First, set up the initial position with no animation
+          setTransitionDuration(0);
           const newGame = createChessGame(currentPuzzle.fen);
-          console.log('Initial position:', newGame.fen());
-          
-          // Set initial position without animation
           setGame(newGame);
           setHighlightedSquares({});
           setCurrentMoveIndex(1);
           setPuzzleStatus('ongoing');
           
-          // Wait 1 second before showing opponent's first move
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Wait a brief moment to ensure the initial position is set
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Then set up the animation for the opponent's first move
+          const firstMove = currentPuzzle.moves[0];
+          const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
+          
+          // Set the animation duration for the piece movement (reduced from 800ms to 600ms)
+          setTransitionDuration(600);
+          
+          // Keep the 1.5 second wait before the move
+          await new Promise(resolve => setTimeout(resolve, 1500));
           
           // Make opponent's first move with animation
           setIsAnimating(true);
-          const firstMove = currentPuzzle.moves[0];
-          const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
           const moveResult = newGame.move({ from, to, promotion: 'q' });
-          console.log('Opponent first move:', moveResult);
-          console.log('Position after move:', newGame.fen());
           
           // Highlight the squares of opponent's move
           setHighlightedSquares({
@@ -60,6 +65,7 @@ export default function Chessboard() {
           setIsAnimating(false);
         } else {
           // Reset to initial state if no puzzle
+          setTransitionDuration(0);
           setGame(createChessGame());
           setHighlightedSquares({});
           setPuzzleStatus('ongoing');
@@ -67,7 +73,6 @@ export default function Chessboard() {
         }
       } catch (error) {
         console.error('Error setting up puzzle:', error);
-        // Reset to initial state on error
         setGame(createChessGame());
         setHighlightedSquares({});
         setPuzzleStatus('ongoing');
@@ -141,7 +146,7 @@ export default function Chessboard() {
         setGame(newGame);
         setCurrentMoveIndex(currentMoveIndex + 2);
         setIsAnimating(false);
-      }, 4000); // Match the animation duration
+      }, 5000); // Increased from 4000 to 5000ms for a longer delay
 
       return true;
     } catch (error) {
@@ -199,7 +204,7 @@ export default function Chessboard() {
           boardWidth={boardWidth}
           boardOrientation={boardOrientation}
           customSquareStyles={highlightedSquares}
-          animationDuration={isAnimating ? 4000 : 0}
+          animationDuration={transitionDuration}
           customBoardStyle={{
             borderRadius: '8px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
