@@ -11,8 +11,8 @@ export default function CategoryRatings() {
 
   // Sort categories by rating
   const sortedCategories = [...categories].sort((a, b) => {
-    const ratingA = userRatings.categories[a.name] || 1200;
-    const ratingB = userRatings.categories[b.name] || 1200;
+    const ratingA = userRatings.categories[a.name]?.rating || 1200;
+    const ratingB = userRatings.categories[b.name]?.rating || 1200;
     return ratingB - ratingA;
   });
 
@@ -24,8 +24,15 @@ export default function CategoryRatings() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Categories</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Average</span>
-          <span className="text-lg font-bold text-blue-600">{Math.round(averageRating)}</span>
+          <span className="text-sm text-gray-500">Overall Rating</span>
+          <div className="text-right">
+            <div className="text-lg font-bold text-blue-600">
+              {Math.round(userRatings.overall.rating)}
+            </div>
+            <div className="text-xs text-gray-500">
+              ±{Math.round(userRatings.overall.ratingDeviation)}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -38,7 +45,8 @@ export default function CategoryRatings() {
                 key={category.name}
                 category={{
                   ...category,
-                  rating: userRatings.categories[category.name] || 1200,
+                  rating: userRatings.categories[category.name]?.rating || 1200,
+                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation
                 }}
                 averageRating={averageRating}
               />
@@ -54,7 +62,8 @@ export default function CategoryRatings() {
                 key={category.name}
                 category={{
                   ...category,
-                  rating: userRatings.categories[category.name] || 1200,
+                  rating: userRatings.categories[category.name]?.rating || 1200,
+                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation
                 }}
                 averageRating={averageRating}
               />

@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Chessboard as ReactChessboard } from 'react-chessboard';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store/store';
 import { createChessGame } from '../utils/chess';
 import { Square, Piece } from 'react-chessboard/dist/chessboard/types';
+import { updateRatingsAfterPuzzle } from '../store/slices/puzzleSlice';
 
 function formatMove(move: string): string {
   return `${move.slice(0, 2)} → ${move.slice(2, 4)}`;
 }
+
+// Define a consistent highlight color
+const HIGHLIGHT_COLOR = { backgroundColor: 'rgba(134, 239, 172, 0.4)' }; // Light green with transparency
 
 export default function Chessboard() {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
@@ -19,6 +23,8 @@ export default function Chessboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(800);
   const [transitionDuration, setTransitionDuration] = useState(300);
+  const dispatch = useDispatch();
+  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
 
   // Get board orientation from FEN - show the side to move at the bottom
   const boardOrientation = currentPuzzle?.fen ? 
@@ -57,8 +63,8 @@ export default function Chessboard() {
           
           // Highlight the squares of opponent's move
           setHighlightedSquares({
-            [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
-            [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+            [from]: HIGHLIGHT_COLOR,
+            [to]: HIGHLIGHT_COLOR
           });
 
           setGame(newGame);
@@ -108,18 +114,28 @@ export default function Chessboard() {
 
       if (move === null) return false;
 
+      // Update highlight color here
+      setHighlightedSquares({
+        [sourceSquare]: HIGHLIGHT_COLOR,
+        [targetSquare]: HIGHLIGHT_COLOR
+      });
+
       // Check if the move matches the expected puzzle move
       const expectedMove = currentPuzzle.moves[currentMoveIndex];
       const moveString = `${sourceSquare}${targetSquare}`;
 
       if (moveString !== expectedMove) {
         setPuzzleStatus('incorrect');
+        console.log('Dispatching rating update for incorrect move');
+        dispatch(updateRatingsAfterPuzzle({ success: false }));
         return true;
       }
 
       // If this was the last move, puzzle is complete
       if (currentMoveIndex === currentPuzzle.moves.length - 1) {
         setPuzzleStatus('correct');
+        console.log('Dispatching rating update for correct puzzle completion');
+        dispatch(updateRatingsAfterPuzzle({ success: true }));
         return true;
       }
 
@@ -135,10 +151,10 @@ export default function Chessboard() {
         });
         console.log('Opponent move result:', opponentMoveResult);
 
-        // Highlight the squares of opponent's move
+        // Update highlight color here
         setHighlightedSquares({
-          [from]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' },
-          [to]: { backgroundColor: 'rgba(255, 100, 100, 0.4)' }
+          [from]: HIGHLIGHT_COLOR,
+          [to]: HIGHLIGHT_COLOR
         });
 
         const newGame = createChessGame(game.fen());
@@ -195,6 +211,53 @@ export default function Chessboard() {
     );
   }
 
+  function renderRatingUpdates() {
+    if (!lastRatingUpdates) return null;
+
+    return (
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg text-sm font-mono">
+        <h3 className="font-medium mb-2 text-gray-700">Rating Updates:</h3>
+        
+        {/* Overall Rating */}
+        <div className="mb-3">
+          <div className="font-medium text-blue-600">Overall:</div>
+          <div className="ml-4">
+            {lastRatingUpdates.overall.oldRating} → {lastRatingUpdates.overall.newRating}
+            <span className="text-gray-500 ml-2">
+              ({lastRatingUpdates.overall.change > 0 ? '+' : ''}{lastRatingUpdates.overall.change})
+            </span>
+            <div className="text-xs text-gray-500">
+              RD: {Math.round(lastRatingUpdates.overall.oldRD)} → {Math.round(lastRatingUpdates.overall.newRD)}
+            </div>
+          </div>
+        </div>
+
+        {/* Category Updates */}
+        <div>
+          <div className="font-medium text-blue-600">Categories:</div>
+          {Object.entries(lastRatingUpdates.categories).length === 0 ? (
+            <div className="ml-4 text-gray-500">No categories updated</div>
+          ) : (
+            Object.entries(lastRatingUpdates.categories).map(([category, update]) => (
+              <div key={category} className="ml-4 mb-2">
+                <div className="font-medium">{category}:</div>
+                <div className="ml-2">
+                  {update.oldRating} → {update.newRating}
+                  <span className="text-gray-500 ml-2">
+                    ({update.change > 0 ? '+' : ''}{update.change})
+                  </span>
+                  <div className="text-xs text-gray-500">
+                    RD: {Math.round(update.oldRD)} → {Math.round(update.newRD)}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div ref={containerRef} className="w-full aspect-square">
@@ -228,16 +291,19 @@ export default function Chessboard() {
         </div>
       )}
       {puzzleStatus !== 'ongoing' && (
-        <div className={`p-4 rounded-lg ${
-          puzzleStatus === 'correct' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          <div className="text-center font-semibold">
-            {puzzleStatus === 'correct' ? 'Puzzle Solved!' : 'Incorrect Move'}
+        <>
+          <div className={`p-4 rounded-lg ${
+            puzzleStatus === 'correct' 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            <div className="text-center font-semibold">
+              {puzzleStatus === 'correct' ? 'Puzzle Solved!' : 'Incorrect Move'}
+            </div>
+            {puzzleStatus === 'incorrect' && renderPuzzleSolution()}
           </div>
-          {puzzleStatus === 'incorrect' && renderPuzzleSolution()}
-        </div>
+          {renderRatingUpdates()}
+        </>
       )}
     </div>
   );

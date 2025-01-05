@@ -15,7 +15,10 @@ export default function Header() {
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-gray-600">
-            Rating: <span className="font-semibold">{userRatings.overall}</span>
+            Rating: <span className="font-semibold">{Math.round(userRatings.overall.rating)}</span>
+            <span className="text-sm text-gray-500 ml-1">
+              ±{Math.round(userRatings.overall.ratingDeviation)}
+            </span>
           </div>
         </div>
       </div>

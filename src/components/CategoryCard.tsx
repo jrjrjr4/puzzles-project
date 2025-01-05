@@ -21,7 +21,9 @@ const categoryIcons: Record<string, LucideIcon> = {
 };
 
 interface CategoryCardProps {
-  category: CategoryRating;
+  category: CategoryRating & {
+    ratingDeviation?: number;
+  };
   averageRating: number;
 }
 
@@ -37,7 +39,14 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
-            <span className="text-sm font-bold text-blue-600">{category.rating}</span>
+            <div className="text-right">
+              <div className="text-sm font-bold text-blue-600">{Math.round(category.rating)}</div>
+              {category.ratingDeviation && (
+                <div className="text-xs text-gray-500">
+                  ±{Math.round(category.ratingDeviation)}
+                </div>
+              )}
+            </div>
           </div>
           <RatingBar rating={category.rating} averageRating={averageRating} />
         </div>
