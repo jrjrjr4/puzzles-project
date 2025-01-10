@@ -183,7 +183,7 @@ export default function Chessboard() {
         setGame(newGame);
         setCurrentMoveIndex(currentMoveIndex + 2);
         setIsAnimating(false);
-      }, 1000); // 1 second delay for opponent moves
+      }, 500); // Reduced from 1000ms to 500ms for faster opponent moves
 
       return true;
     } catch (error) {

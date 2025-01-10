@@ -7,6 +7,7 @@ import { CategoryCard } from './CategoryCard';
 
 export default function CategoryRatings() {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
+  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   
   // Defensive check for userRatings
   if (!userRatings) {
@@ -29,16 +30,9 @@ export default function CategoryRatings() {
     const ratingB = userRatings.categories[b.name]?.rating || 1200;
     return ratingB - ratingA;
   });
-  console.log('Sorted categories:', sortedCategories.map(c => ({
-    name: c.name,
-    rating: userRatings.categories[c.name]?.rating || 1200
-  })));
 
   const strongestCategories = sortedCategories.slice(0, 3);
   const weakestCategories = sortedCategories.slice(-3).reverse();
-  
-  console.log('Strongest categories:', strongestCategories);
-  console.log('Weakest categories:', weakestCategories);
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 h-full w-full max-w-full">
@@ -47,9 +41,25 @@ export default function CategoryRatings() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Overall Rating</span>
           <div className="text-right">
-            <div className="text-base sm:text-lg font-bold text-blue-600">
-              {Math.round(userRatings.overall.rating)}
-            </div>
+            {lastRatingUpdates ? (
+              <div className="flex items-center gap-2">
+                <div className="text-base sm:text-lg font-bold text-blue-600">
+                  {Math.round(lastRatingUpdates.overall.oldRating)}
+                </div>
+                <div className="text-sm">→</div>
+                <div className={`text-base sm:text-lg font-bold ${
+                  lastRatingUpdates.overall.newRating > lastRatingUpdates.overall.oldRating 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  {Math.round(lastRatingUpdates.overall.newRating)}
+                </div>
+              </div>
+            ) : (
+              <div className="text-base sm:text-lg font-bold text-blue-600">
+                {Math.round(userRatings.overall.rating)}
+              </div>
+            )}
             <div className="text-xs text-gray-500">
               ±{Math.round(userRatings.overall.ratingDeviation)}
             </div>

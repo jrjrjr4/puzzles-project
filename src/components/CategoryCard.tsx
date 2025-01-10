@@ -17,6 +17,8 @@ import {
   LucideIcon 
 } from 'lucide-react';
 import { CategoryRating } from '../types/category';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/store';
 import RatingBar from './RatingBar';
 
 const categoryIcons: Record<string, LucideIcon> = {
@@ -45,6 +47,8 @@ interface CategoryCardProps {
 
 export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   const Icon = categoryIcons[category.name] || Crosshair;
+  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
+  const ratingUpdate = lastRatingUpdates?.categories[category.name];
 
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
@@ -60,9 +64,25 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
         </div>
       </div>
       <div className="text-right">
-        <div className="text-base sm:text-lg font-semibold text-blue-600">
-          {Math.round(category.rating)}
-        </div>
+        {ratingUpdate ? (
+          <div className="flex items-center gap-2">
+            <div className="text-base sm:text-lg font-semibold text-blue-600">
+              {Math.round(ratingUpdate.oldRating)}
+            </div>
+            <div className="text-sm">→</div>
+            <div className={`text-base sm:text-lg font-semibold ${
+              ratingUpdate.newRating > ratingUpdate.oldRating 
+                ? 'text-green-600' 
+                : 'text-red-600'
+            }`}>
+              {Math.round(ratingUpdate.newRating)}
+            </div>
+          </div>
+        ) : (
+          <div className="text-base sm:text-lg font-semibold text-blue-600">
+            {Math.round(category.rating)}
+          </div>
+        )}
         <div className="text-xs text-gray-500">
           ±{Math.round(category.ratingDeviation || 350)}
         </div>
