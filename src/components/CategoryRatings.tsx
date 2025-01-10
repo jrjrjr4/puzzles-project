@@ -7,12 +7,23 @@ import { CategoryCard } from './CategoryCard';
 
 export default function CategoryRatings() {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
-  console.log('Current user ratings:', userRatings);
   
+  // Defensive check for userRatings
+  if (!userRatings) {
+    console.warn('No user ratings found');
+    return null;
+  }
+
+  // Ensure categories is defined and not empty
+  if (!categories || categories.length === 0) {
+    console.warn('No categories defined');
+    return null;
+  }
+
   const averageRating = calculateAverageRating(categories);
   console.log('Average rating:', averageRating);
 
-  // Sort categories by rating
+  // Sort categories by actual user ratings
   const sortedCategories = [...categories].sort((a, b) => {
     const ratingA = userRatings.categories[a.name]?.rating || 1200;
     const ratingB = userRatings.categories[b.name]?.rating || 1200;
@@ -56,7 +67,7 @@ export default function CategoryRatings() {
                 category={{
                   ...category,
                   rating: userRatings.categories[category.name]?.rating || 1200,
-                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation
+                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}
               />
@@ -73,7 +84,7 @@ export default function CategoryRatings() {
                 category={{
                   ...category,
                   rating: userRatings.categories[category.name]?.rating || 1200,
-                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation
+                  ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}
               />
