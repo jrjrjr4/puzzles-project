@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PuzzleState, Puzzle } from '../../types/puzzle';
 import { calculateRatingChange, calculateAverageRating, BASE_RD } from '../../utils/ratings';
+import { themeToCategory } from '../../data/categories';
 
 interface RatingWithDeviation {
   rating: number;
@@ -40,63 +41,112 @@ const puzzleSlice = createSlice({
   initialState,
   reducers: {
     setCurrentPuzzle: (state, action) => {
-      state.currentPuzzle = action.payload;
-      state.lastRatingUpdates = null;
+      console.log('Setting current puzzle:', action.payload);
+      if (!action.payload) {
+        console.warn('Attempted to set null puzzle');
+        return;
+      }
+      
+      try {
+        state.currentPuzzle = {
+          ...action.payload,
+          themes: action.payload.themes || ['Tactics'],
+          rating: Number(action.payload.rating) || 1200,
+          ratingDeviation: Number(action.payload.ratingDeviation) || BASE_RD,
+        };
+        console.log('Current puzzle set to:', state.currentPuzzle);
+        state.lastRatingUpdates = null;
+      } catch (error) {
+        console.error('Error setting current puzzle:', error);
+        state.currentPuzzle = null;
+      }
     },
     updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean }>) => {
+      console.log('Updating ratings after puzzle. Success:', action.payload.success);
+      
       if (!state.currentPuzzle) {
         console.log('No current puzzle, skipping rating update');
         return;
       }
 
-      const score = action.payload.success ? 1 : 0;
-      console.log('Calculating rating updates with score:', score);
-      
-      const updates: PuzzleState['lastRatingUpdates'] = {
-        overall: calculateRatingChange(
-          state.userRatings.overall.rating,
-          state.userRatings.overall.ratingDeviation,
-          state.currentPuzzle.rating,
-          state.currentPuzzle.ratingDeviation,
-          score
-        ),
-        categories: {}
-      };
+      try {
+        const score = action.payload.success ? 1 : 0;
+        console.log('Current puzzle themes:', state.currentPuzzle.themes);
+        
+        // Map puzzle themes to our categories
+        const themes = state.currentPuzzle.themes
+          .map(theme => {
+            const category = themeToCategory[theme];
+            console.log(`Mapping theme ${theme} to category ${category}`);
+            return category;
+          })
+          .filter((theme): theme is string => !!theme);
 
-      console.log('Overall rating update:', updates.overall);
+        console.log('Mapped themes to categories:', themes);
 
-      // Update overall rating
-      state.userRatings.overall = {
-        rating: updates.overall.newRating,
-        ratingDeviation: updates.overall.newRD
-      };
-
-      // Update category ratings
-      state.currentPuzzle.themes.forEach(theme => {
-        console.log(`Updating category ${theme}`);
-        const categoryRating = state.userRatings.categories[theme] || {
-          rating: 1200,
-          ratingDeviation: BASE_RD
+        const updates = {
+          overall: calculateRatingChange(
+            state.userRatings.overall.rating,
+            state.userRatings.overall.ratingDeviation,
+            state.currentPuzzle.rating,
+            state.currentPuzzle.ratingDeviation,
+            score
+          ),
+          categories: {}
         };
 
-        const update = calculateRatingChange(
-          categoryRating.rating,
-          categoryRating.ratingDeviation,
-          state.currentPuzzle!.rating,
-          state.currentPuzzle!.ratingDeviation,
-          score
-        );
+        console.log('Overall rating update:', {
+          old: state.userRatings.overall.rating,
+          new: updates.overall.newRating,
+          change: updates.overall.newRating - state.userRatings.overall.rating
+        });
 
-        state.userRatings.categories[theme] = {
-          rating: update.newRating,
-          ratingDeviation: update.newRD
+        // Update overall rating
+        state.userRatings.overall = {
+          rating: updates.overall.newRating,
+          ratingDeviation: updates.overall.newRD
         };
 
-        updates.categories[theme] = update;
-      });
+        // Update category ratings
+        themes.forEach(category => {
+          console.log(`Processing category: ${category}`);
+          const categoryRating = state.userRatings.categories[category] || {
+            rating: 1200,
+            ratingDeviation: BASE_RD
+          };
 
-      state.lastRatingUpdates = updates;
-      console.log('Final lastRatingUpdates:', updates);
+          const update = calculateRatingChange(
+            categoryRating.rating,
+            categoryRating.ratingDeviation,
+            state.currentPuzzle!.rating,
+            state.currentPuzzle!.ratingDeviation,
+            score
+          );
+
+          console.log(`Category ${category} rating update:`, {
+            old: categoryRating.rating,
+            new: update.newRating,
+            change: update.newRating - categoryRating.rating
+          });
+
+          state.userRatings.categories[category] = {
+            rating: update.newRating,
+            ratingDeviation: update.newRD
+          };
+
+          updates.categories[category] = update;
+        });
+
+        state.lastRatingUpdates = updates;
+        console.log('Final rating updates:', updates);
+        
+        // Save to localStorage
+        console.log('Saving ratings to localStorage:', state.userRatings);
+        localStorage.setItem('chess_puzzle_ratings', JSON.stringify(state.userRatings));
+
+      } catch (error) {
+        console.error('Error updating ratings:', error);
+      }
     }
   }
 });

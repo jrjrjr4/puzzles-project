@@ -28,27 +28,27 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, averageRating }: CategoryCardProps) {
-  const Icon = categoryIcons[category.name] || Crosshair;
-
   return (
-    <div className="bg-gray-50 rounded-lg p-4 transition-transform hover:scale-102">
-      <div className="flex items-center gap-4">
-        <div className="p-2 bg-blue-100 rounded-full">
-          <Icon className="w-5 h-5 text-blue-600" />
-        </div>
-        <div className="flex-1">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
-            <div className="text-right">
-              <div className="text-sm font-bold text-blue-600">{Math.round(category.rating)}</div>
-              {category.ratingDeviation && (
-                <div className="text-xs text-gray-500">
-                  ±{Math.round(category.ratingDeviation)}
-                </div>
-              )}
-            </div>
+    <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center space-x-3">
+        <div className="flex-shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 text-sm sm:text-base">
+              {category.icon || category.name[0]}
+            </span>
           </div>
-          <RatingBar rating={category.rating} averageRating={averageRating} />
+        </div>
+        <div>
+          <h4 className="text-sm sm:text-base font-medium text-gray-900">{category.name}</h4>
+          <p className="text-xs sm:text-sm text-gray-500">{category.description}</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-base sm:text-lg font-semibold text-blue-600">
+          {Math.round(category.rating)}
+        </div>
+        <div className="text-xs text-gray-500">
+          ±{Math.round(category.ratingDeviation || 350)}
         </div>
       </div>
     </div>
