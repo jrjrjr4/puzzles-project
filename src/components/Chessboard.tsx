@@ -55,7 +55,7 @@ export default function Chessboard() {
           setTransitionDuration(600);
           
           // Keep the 1.5 second wait before the move
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Make opponent's first move with animation
           setIsAnimating(true);
@@ -162,7 +162,7 @@ export default function Chessboard() {
         setGame(newGame);
         setCurrentMoveIndex(currentMoveIndex + 2);
         setIsAnimating(false);
-      }, 5000); // Increased from 4000 to 5000ms for a longer delay
+      }, 1667); // Reduced from 5000ms to 1667ms (1/3 of original)
 
       return true;
     } catch (error) {

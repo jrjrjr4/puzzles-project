@@ -1,11 +1,19 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PuzzleState, Puzzle } from '../../types/puzzle';
-import { calculateRatingChange, calculateAverageRating, BASE_RD } from '../../utils/ratings';
-import { themeToCategory } from '../../data/categories';
+import { Puzzle } from '../../types/puzzle';
+import { calculateRatingChange, BASE_RD } from '../../utils/ratings';
+import { mapThemeToCategory } from '../../utils/puzzles';
 
 interface RatingWithDeviation {
   rating: number;
   ratingDeviation: number;
+}
+
+interface RatingUpdate {
+  oldRating: number;
+  newRating: number;
+  oldRD: number;
+  newRD: number;
+  change: number;
 }
 
 interface PuzzleState {
@@ -75,16 +83,15 @@ const puzzleSlice = createSlice({
         
         // Map puzzle themes to our categories
         const themes = state.currentPuzzle.themes
-          .map(theme => {
-            const category = themeToCategory[theme];
-            console.log(`Mapping theme ${theme} to category ${category}`);
-            return category;
-          })
-          .filter((theme): theme is string => !!theme);
+          .map(theme => mapThemeToCategory(theme))
+          .filter((theme): theme is string => theme !== undefined);
 
         console.log('Mapped themes to categories:', themes);
 
-        const updates = {
+        const updates: {
+          overall: RatingUpdate;
+          categories: Record<string, RatingUpdate>;
+        } = {
           overall: calculateRatingChange(
             state.userRatings.overall.rating,
             state.userRatings.overall.ratingDeviation,
@@ -139,7 +146,7 @@ const puzzleSlice = createSlice({
 
         state.lastRatingUpdates = updates;
         console.log('Final rating updates:', updates);
-        
+
         // Save to localStorage
         console.log('Saving ratings to localStorage:', state.userRatings);
         localStorage.setItem('chess_puzzle_ratings', JSON.stringify(state.userRatings));

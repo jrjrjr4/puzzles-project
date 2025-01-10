@@ -1,23 +1,39 @@
 import React from 'react';
 import { 
-  Sword, 
-  Anchor, 
-  Target, 
-  Shield, 
-  Crown, 
+  Sword,
+  Anchor,
+  Target,
+  Shield,
+  Crown,
   Crosshair,
+  Hammer,
+  Scissors,
+  Zap,
+  Trophy,
+  Swords,
+  CircleDot,
+  Boxes,
+  Castle,
   LucideIcon 
 } from 'lucide-react';
 import { CategoryRating } from '../types/category';
 import RatingBar from './RatingBar';
 
 const categoryIcons: Record<string, LucideIcon> = {
-  'Forks': Target,
-  'Pins': Anchor,
-  'Skewers': Sword,
-  'Defense': Shield,
-  'Endgame': Crown,
-  'Tactics': Crosshair,
+  'Crushing': Hammer,
+  'Advantage': Zap,
+  'Mate': Crown,
+  'Fork': Scissors,
+  'Pin': Anchor,
+  'Skewer': Sword,
+  'Hanging Piece': Target,
+  'Trapped Piece': Boxes,
+  'Exposed King': Shield,
+  'Middlegame': Swords,
+  'Endgame': Castle,
+  'Pawn Endgame': CircleDot,
+  'Rook Endgame': Castle,
+  'Master Game': Trophy
 };
 
 interface CategoryCardProps {
@@ -28,14 +44,14 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, averageRating }: CategoryCardProps) {
+  const Icon = categoryIcons[category.name] || Crosshair;
+
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
       <div className="flex items-center space-x-3">
         <div className="flex-shrink-0">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-600 text-sm sm:text-base">
-              {category.icon || category.name[0]}
-            </span>
+            <Icon className="w-5 h-5 text-blue-600" />
           </div>
         </div>
         <div>

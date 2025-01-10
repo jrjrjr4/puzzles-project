@@ -2,49 +2,74 @@ import { CategoryRating } from '../types/category';
 
 export const categories: CategoryRating[] = [
   {
-    name: 'Forks',
+    name: 'Crushing',
     rating: 1200,
-    description: 'Attack two pieces at once'
+    description: 'Winning material or position decisively'
   },
   {
-    name: 'Pins',
+    name: 'Advantage',
+    rating: 1200,
+    description: 'Gaining a significant advantage'
+  },
+  {
+    name: 'Mate',
+    rating: 1200,
+    description: 'Checkmate patterns and sequences'
+  },
+  {
+    name: 'Fork',
+    rating: 1200,
+    description: 'Attack multiple pieces at once'
+  },
+  {
+    name: 'Pin',
     rating: 1200,
     description: 'Pin pieces to important squares'
   },
   {
-    name: 'Skewers',
+    name: 'Skewer',
     rating: 1200,
     description: 'Attack pieces in a line'
   },
   {
-    name: 'Defense',
+    name: 'Hanging Piece',
     rating: 1200,
-    description: 'Defend against threats'
+    description: 'Capture undefended pieces'
+  },
+  {
+    name: 'Trapped Piece',
+    rating: 1200,
+    description: 'Trap opponent\'s pieces'
+  },
+  {
+    name: 'Exposed King',
+    rating: 1200,
+    description: 'Attack exposed king positions'
+  },
+  {
+    name: 'Middlegame',
+    rating: 1200,
+    description: 'Middlegame tactics and strategy'
   },
   {
     name: 'Endgame',
     rating: 1200,
-    description: 'End game tactics and strategy'
+    description: 'Endgame tactics and strategy'
   },
   {
-    name: 'Tactics',
+    name: 'Pawn Endgame',
     rating: 1200,
-    description: 'General tactical patterns'
+    description: 'Endgames with mainly pawns'
   },
   {
-    name: 'Mate in 2',
+    name: 'Rook Endgame',
     rating: 1200,
-    description: 'Checkmate in two moves'
+    description: 'Endgames with rooks'
   },
   {
-    name: 'Mate in 3',
+    name: 'Master Game',
     rating: 1200,
-    description: 'Checkmate in three moves'
-  },
-  {
-    name: 'Sacrifice',
-    rating: 1200,
-    description: 'Material sacrifice for advantage'
+    description: 'Puzzles from master-level games'
   }
 ];
 
