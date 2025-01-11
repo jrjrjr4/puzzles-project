@@ -17,7 +17,7 @@ export default function GameSection() {
       setError(null);
 
       console.log('Fetching puzzle CSV...');
-      const response = await fetch('/lichess_puzzles_trim.csv');
+      const response = await fetch('/filtered_puzzles.csv');
       if (!response.ok) {
         throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
       }

@@ -2,24 +2,19 @@ import { CategoryRating } from '../types/category';
 
 export const categories: CategoryRating[] = [
   {
-    name: 'Crushing',
-    rating: 1200,
-    description: 'Winning material or position decisively'
-  },
-  {
-    name: 'Advantage',
-    rating: 1200,
-    description: 'Gaining a significant advantage'
-  },
-  {
     name: 'Mate',
     rating: 1200,
     description: 'Checkmate patterns and sequences'
   },
   {
-    name: 'Fork',
+    name: 'Endgame',
     rating: 1200,
-    description: 'Attack multiple pieces at once'
+    description: 'Critical endgame positions'
+  },
+  {
+    name: 'Defense',
+    rating: 1200,
+    description: 'Find the best defensive move'
   },
   {
     name: 'Pin',
@@ -27,49 +22,34 @@ export const categories: CategoryRating[] = [
     description: 'Pin pieces to important squares'
   },
   {
-    name: 'Skewer',
+    name: 'Deflection',
     rating: 1200,
-    description: 'Attack pieces in a line'
+    description: 'Force a piece away from an important square'
   },
   {
-    name: 'Hanging Piece',
+    name: 'Discovered Attack',
     rating: 1200,
-    description: 'Capture undefended pieces'
+    description: 'Move one piece to reveal an attack from another'
   },
   {
-    name: 'Trapped Piece',
+    name: 'Kingside Attack',
     rating: 1200,
-    description: 'Trap opponent\'s pieces'
+    description: 'Attack the opponent\'s kingside'
   },
   {
-    name: 'Exposed King',
+    name: 'Fork',
     rating: 1200,
-    description: 'Attack exposed king positions'
+    description: 'Attack multiple pieces at once'
   },
   {
-    name: 'Middlegame',
+    name: 'Capturing Defender',
     rating: 1200,
-    description: 'Middlegame tactics and strategy'
+    description: 'Remove a key defensive piece'
   },
   {
-    name: 'Endgame',
+    name: 'Quiet Move',
     rating: 1200,
-    description: 'Endgame tactics and strategy'
-  },
-  {
-    name: 'Pawn Endgame',
-    rating: 1200,
-    description: 'Endgames with mainly pawns'
-  },
-  {
-    name: 'Rook Endgame',
-    rating: 1200,
-    description: 'Endgames with rooks'
-  },
-  {
-    name: 'Master Game',
-    rating: 1200,
-    description: 'Puzzles from master-level games'
+    description: 'A subtle move that prepares a tactical strike'
   }
 ];
 

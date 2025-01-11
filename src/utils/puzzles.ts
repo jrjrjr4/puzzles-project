@@ -3,30 +3,16 @@ import { Puzzle } from '../types/puzzle';
 // Map Lichess puzzle themes to our category names
 export function mapThemeToCategory(theme: string): string | undefined {
   const themeMap: Record<string, string | undefined> = {
-    'crushing': 'Crushing',
-    'advantage': 'Advantage',
     'mate': 'Mate',
-    'mateIn1': 'Mate',
-    'mateIn2': 'Mate',
-    'mateIn3': 'Mate',
-    'mateIn4': 'Mate',
-    'mateIn5': 'Mate',
-    'backRankMate': 'Mate',
-    'fork': 'Fork',
-    'pin': 'Pin',
-    'skewer': 'Skewer',
-    'hangingPiece': 'Hanging Piece',
-    'trappedPiece': 'Trapped Piece',
-    'exposedKing': 'Exposed King',
-    'middlegame': 'Middlegame',
     'endgame': 'Endgame',
-    'pawnEndgame': 'Pawn Endgame',
-    'rookEndgame': 'Rook Endgame',
-    'master': 'Master Game',
-    'masterGame': 'Master Game',
-    'short': undefined, // These are puzzle length indicators, not themes
-    'long': undefined,
-    'veryLong': undefined
+    'defensivemove': 'Defense',
+    'pin': 'Pin',
+    'deflection': 'Deflection',
+    'discoveredattack': 'Discovered Attack',
+    'kingsideattack': 'Kingside Attack',
+    'fork': 'Fork',
+    'capturingdefender': 'Capturing Defender',
+    'quietmove': 'Quiet Move'
   };
 
   return themeMap[theme.toLowerCase()];
