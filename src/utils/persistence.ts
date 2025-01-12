@@ -19,13 +19,13 @@ interface SeenPuzzleRow {
 }
 
 export async function saveUserRatings(ratings: UserRatings) {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
   const { error } = await supabase
     .from('user_ratings')
     .upsert({
-      user_id: user.data.user.id,
+      user_id: user.id,
       overall_rating: ratings.overall.rating,
       overall_rating_deviation: ratings.overall.ratingDeviation,
       category_ratings: ratings.categories
@@ -37,16 +37,17 @@ export async function saveUserRatings(ratings: UserRatings) {
 }
 
 export async function loadUserRatings(): Promise<UserRatings | null> {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
+  // First try to load existing ratings
   const { data, error } = await supabase
     .from('user_ratings')
-    .select('*')
-    .eq('user_id', user.data.user.id)
-    .single();
+    .select()
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     console.error('Error loading user ratings:', error);
     return null;
   }
@@ -74,13 +75,13 @@ export async function loadUserRatings(): Promise<UserRatings | null> {
 }
 
 export async function addSeenPuzzle(puzzleId: string) {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
   const { error } = await supabase
     .from('seen_puzzles')
     .insert({
-      user_id: user.data.user.id,
+      user_id: user.id,
       puzzle_id: puzzleId
     });
 
@@ -90,32 +91,31 @@ export async function addSeenPuzzle(puzzleId: string) {
 }
 
 export async function loadSeenPuzzles(): Promise<Set<string>> {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return new Set();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new Set();
 
   const { data, error } = await supabase
     .from('seen_puzzles')
     .select('puzzle_id')
-    .eq('user_id', user.data.user.id);
+    .eq('user_id', user.id);
 
   if (error) {
     console.error('Error loading seen puzzles:', error);
     return new Set();
   }
 
-  return new Set(data.map((row: SeenPuzzleRow) => row.puzzle_id));
+  return new Set(data?.map((row: SeenPuzzleRow) => row.puzzle_id) || []);
 }
 
 export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
   if (puzzle === null) {
-    // Delete current puzzle if null
     const { error } = await supabase
       .from('current_puzzle')
       .delete()
-      .eq('user_id', user.data.user.id);
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting current puzzle:', error);
@@ -126,7 +126,7 @@ export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
   const { error } = await supabase
     .from('current_puzzle')
     .upsert({
-      user_id: user.data.user.id,
+      user_id: user.id,
       puzzle_data: puzzle
     });
 
@@ -136,16 +136,16 @@ export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
 }
 
 export async function loadCurrentPuzzle(): Promise<Puzzle | null> {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   const { data, error } = await supabase
     .from('current_puzzle')
     .select('puzzle_data')
-    .eq('user_id', user.data.user.id)
-    .single();
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     console.error('Error loading current puzzle:', error);
     return null;
   }
