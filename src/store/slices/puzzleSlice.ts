@@ -5,7 +5,7 @@ import { saveUserRatings, saveCurrentPuzzle, addSeenPuzzle, loadUserRatings, loa
 
 interface PuzzleState {
   currentPuzzle: Puzzle | null;
-  usedPuzzleIds: Set<string>;
+  usedPuzzleIds: string[];
   userRatings: {
     overall: {
       rating: number;
@@ -34,7 +34,7 @@ interface PuzzleState {
 
 const initialState: PuzzleState = {
   currentPuzzle: null,
-  usedPuzzleIds: new Set(),
+  usedPuzzleIds: [],
   userRatings: {
     overall: {
       rating: 1200,
@@ -45,7 +45,6 @@ const initialState: PuzzleState = {
   lastRatingUpdates: null
 };
 
-// Async thunks for loading persisted state
 export const loadPersistedState = createAsyncThunk(
   'puzzle/loadPersistedState',
   async () => {
@@ -54,7 +53,11 @@ export const loadPersistedState = createAsyncThunk(
       loadSeenPuzzles(),
       loadCurrentPuzzle()
     ]);
-    return { ratings, seenPuzzles, currentPuzzle };
+    return {
+      ratings,
+      seenPuzzles: Array.from(seenPuzzles),
+      currentPuzzle
+    };
   }
 );
 
@@ -63,18 +66,31 @@ export const puzzleSlice = createSlice({
   initialState,
   reducers: {
     setCurrentPuzzle: (state, action: PayloadAction<Puzzle | null>) => {
-      state.currentPuzzle = action.payload;
       if (action.payload) {
-        state.usedPuzzleIds.add(action.payload.id);
-        addSeenPuzzle(action.payload.id); // Persist seen puzzle
+        const puzzle: Puzzle = {
+          ...action.payload,
+          rating: Number(action.payload.rating) || 1200,
+          ratingDeviation: Number(action.payload.ratingDeviation) || 350,
+          themes: action.payload.themes || ['tactics'],
+          moves: Array.isArray(action.payload.moves) ? action.payload.moves : [],
+          id: String(action.payload.id)
+        };
+        state.currentPuzzle = puzzle;
+        if (!state.usedPuzzleIds.includes(puzzle.id)) {
+          state.usedPuzzleIds.push(puzzle.id);
+          addSeenPuzzle(puzzle.id);
+        }
+        saveCurrentPuzzle(puzzle);
+      } else {
+        state.currentPuzzle = null;
+        saveCurrentPuzzle(null);
       }
-      saveCurrentPuzzle(action.payload); // Persist current puzzle
     },
     updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean }>) => {
       if (!state.currentPuzzle) return;
 
-      const puzzleRating = state.currentPuzzle.rating;
-      const puzzleRD = state.currentPuzzle.ratingDeviation;
+      const puzzleRating = Number(state.currentPuzzle.rating) || 1200;
+      const puzzleRD = Number(state.currentPuzzle.ratingDeviation) || 350;
 
       // Update overall rating
       const oldOverallRating = state.userRatings.overall.rating;
@@ -90,6 +106,8 @@ export const puzzleSlice = createSlice({
       // Update category ratings
       const categoryUpdates: { [category: string]: { oldRating: number; newRating: number } } = {};
       state.currentPuzzle.themes.forEach(theme => {
+        if (!theme) return;
+        
         const oldCategoryRating = state.userRatings.categories[theme]?.rating || 1200;
         const oldCategoryRD = state.userRatings.categories[theme]?.ratingDeviation || 350;
         const { newRating, newRD } = calculateNewRating(
@@ -135,7 +153,15 @@ export const puzzleSlice = createSlice({
         state.usedPuzzleIds = action.payload.seenPuzzles;
       }
       if (action.payload.currentPuzzle) {
-        state.currentPuzzle = action.payload.currentPuzzle;
+        const puzzle = {
+          ...action.payload.currentPuzzle,
+          rating: Number(action.payload.currentPuzzle.rating) || 1200,
+          ratingDeviation: Number(action.payload.currentPuzzle.ratingDeviation) || 350,
+          themes: action.payload.currentPuzzle.themes || ['tactics'],
+          moves: Array.isArray(action.payload.currentPuzzle.moves) ? action.payload.currentPuzzle.moves : [],
+          id: String(action.payload.currentPuzzle.id)
+        };
+        state.currentPuzzle = puzzle;
       }
     });
   }
