@@ -1,119 +1,112 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-
-interface AuthMessage {
-  type: 'error' | 'success';
-  text: string;
-}
+import { useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { supabase } from '../utils/supabase';
+import { setError } from '../store/slices/authSlice';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState<AuthMessage | null>(null);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
-    
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'An error occurred during sign in'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const dispatch = useDispatch();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
-    
     try {
       setLoading(true);
       const { error } = await supabase.auth.signUp({
         email,
         password,
       });
-
       if (error) throw error;
-      
-      setMessage({
-        type: 'success',
-        text: 'Success! Check your email for the confirmation link.'
-      });
+      alert('Check your email for the confirmation link!');
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'An error occurred during sign up'
+      dispatch(setError((error as Error).message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+      if (error) throw error;
+    } catch (error) {
+      dispatch(setError((error as Error).message));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold text-center mb-6">Welcome to Chess Training</h2>
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            required
-          />
-        </div>
-        {message && (
-          <div className={`p-3 rounded ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-            {message.text}
+    <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-sm">
+        <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
+          Sign in to your account
+        </h2>
+      </div>
+
+      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+        <form className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
+              Email address
+            </label>
+            <div className="mt-2">
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
+              />
+            </div>
           </div>
-        )}
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Sign In'}
-          </button>
-          <button
-            type="button"
-            onClick={handleSignUp}
-            disabled={loading}
-            className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Sign Up'}
-          </button>
-        </div>
-      </form>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium leading-6 text-gray-900">
+              Password
+            </label>
+            <div className="mt-2">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-4">
+            <button
+              onClick={handleSignIn}
+              disabled={loading}
+              className="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              {loading ? 'Loading...' : 'Sign in'}
+            </button>
+            <button
+              onClick={handleSignUp}
+              disabled={loading}
+              type="button"
+              className="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-blue-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+            >
+              {loading ? 'Loading...' : 'Sign up'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 } 
