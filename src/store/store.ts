@@ -1,11 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
 import puzzleReducer from './slices/puzzleSlice';
-import authReducer from './slices/authSlice';
 
 export const store = configureStore({
   reducer: {
     puzzle: puzzleReducer,
-    auth: authReducer,
   },
 });
 
