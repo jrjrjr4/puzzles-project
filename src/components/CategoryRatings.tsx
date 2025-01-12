@@ -35,7 +35,7 @@ export default function CategoryRatings() {
   const weakestCategories = sortedCategories.slice(-3).reverse();
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 h-full w-full max-w-full">
+    <div className="bg-white p-4 sm:p-6 h-full w-full max-w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2 sm:mb-0">Categories</h2>
         <div className="flex items-center gap-2">

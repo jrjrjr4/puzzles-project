@@ -120,21 +120,23 @@ export default function GameSection() {
         </div>
       </div>
 
-      {/* Resizer handle */}
-      <div
-        className="hidden lg:block w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors"
-        onMouseDown={handleMouseDown}
-      />
+      <div className="flex lg:h-fit">
+        {/* Resizer handle */}
+        <div
+          className="hidden lg:block w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors"
+          onMouseDown={handleMouseDown}
+        />
 
-      <div 
-        className="w-full lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
-        style={{ width: `${rightPanelWidth}px` }}
-      >
-        <div className="sticky top-0 bg-gray-50 z-10">
-          <PuzzleInfo />
-        </div>
-        <div className="pb-8">
-          <CategoryRatings />
+        <div 
+          className="w-full lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
+          style={{ width: `${rightPanelWidth}px` }}
+        >
+          <div className="sticky top-0 bg-gray-50 z-10">
+            <PuzzleInfo />
+          </div>
+          <div className="pb-8">
+            <CategoryRatings />
+          </div>
         </div>
       </div>
     </div>

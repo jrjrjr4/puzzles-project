@@ -25,17 +25,17 @@ export default function PuzzleInfo() {
     .filter((theme, index, self) => self.indexOf(theme) === index);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Puzzle Info</h2>
-      <div className="space-y-4">
+    <div className="bg-white rounded-xl shadow-lg p-4">
+      <h2 className="text-xl font-semibold text-gray-800 mb-3">Puzzle Info</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {/* Puzzle ID Section */}
-        <div>
+        <div className="min-w-[120px]">
           <div className="text-sm text-gray-500">Puzzle ID</div>
           <div className="font-medium">{puzzle.id}</div>
         </div>
 
         {/* Rating Section */}
-        <div>
+        <div className="min-w-[140px]">
           <div className="text-sm text-gray-500">Rating</div>
           <div className="font-medium">
             {rating.toLocaleString()}
@@ -49,7 +49,7 @@ export default function PuzzleInfo() {
         </div>
 
         {/* Popularity Section */}
-        <div>
+        <div className="min-w-[140px]">
           <div className="text-sm text-gray-500">Popularity</div>
           <div className="font-medium">
             {puzzle.popularity}%
@@ -59,8 +59,8 @@ export default function PuzzleInfo() {
           </div>
         </div>
 
-        {/* Themes Section */}
-        <div>
+        {/* Themes Section - spans full width */}
+        <div className="col-span-2 md:col-span-3">
           <div className="text-sm text-gray-500">Themes</div>
           <div className="flex flex-wrap gap-2 mt-1">
             {displayThemes.map((theme) => (

@@ -51,21 +51,18 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   const ratingUpdate = lastRatingUpdates?.categories[category.name];
 
   return (
-    <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center space-x-3">
+    <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center space-x-3 mb-2">
         <div className="flex-shrink-0">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
             <Icon className="w-5 h-5 text-blue-600" />
           </div>
         </div>
-        <div>
-          <h4 className="text-sm sm:text-base font-medium text-gray-900">{category.name}</h4>
-          <p className="text-xs sm:text-sm text-gray-500">{category.description}</p>
-        </div>
+        <h4 className="text-sm sm:text-base font-medium text-gray-900">{category.name}</h4>
       </div>
-      <div className="text-right">
+      <div className="text-center">
         {ratingUpdate ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <div className="text-base sm:text-lg font-semibold text-blue-600">
               {Math.round(ratingUpdate.oldRating)}
             </div>
