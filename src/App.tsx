@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { Session } from '@supabase/supabase-js';
 import { AppDispatch } from './store/store';
 import { loadPersistedState } from './store/slices/puzzleSlice';
 import { supabase } from './lib/supabaseClient';
@@ -9,7 +10,7 @@ import { Auth } from './components/Auth';
 
 export default function App() {
   const dispatch = useDispatch<AppDispatch>();
-  const [session, setSession] = React.useState<null | any>(null);
+  const [session, setSession] = React.useState<Session | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   useEffect(() => {

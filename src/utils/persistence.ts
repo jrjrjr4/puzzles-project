@@ -51,14 +51,25 @@ export async function loadUserRatings(): Promise<UserRatings | null> {
     return null;
   }
 
-  if (!data) return null;
+  if (!data) {
+    // Create default ratings if none exist
+    const defaultRatings: UserRatings = {
+      overall: {
+        rating: 1200,
+        ratingDeviation: 350
+      },
+      categories: {}
+    };
+    await saveUserRatings(defaultRatings);
+    return defaultRatings;
+  }
 
   return {
     overall: {
       rating: data.overall_rating,
       ratingDeviation: data.overall_rating_deviation
     },
-    categories: data.category_ratings
+    categories: data.category_ratings || {}
   };
 }
 
@@ -73,7 +84,7 @@ export async function addSeenPuzzle(puzzleId: string) {
       puzzle_id: puzzleId
     });
 
-  if (error) {
+  if (error && !error.message.includes('duplicate key')) {
     console.error('Error adding seen puzzle:', error);
   }
 }
@@ -95,9 +106,22 @@ export async function loadSeenPuzzles(): Promise<Set<string>> {
   return new Set(data.map((row: SeenPuzzleRow) => row.puzzle_id));
 }
 
-export async function saveCurrentPuzzle(puzzle: Puzzle) {
+export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
   const user = await supabase.auth.getUser();
   if (!user.data.user) return;
+
+  if (puzzle === null) {
+    // Delete current puzzle if null
+    const { error } = await supabase
+      .from('current_puzzle')
+      .delete()
+      .eq('user_id', user.data.user.id);
+
+    if (error) {
+      console.error('Error deleting current puzzle:', error);
+    }
+    return;
+  }
 
   const { error } = await supabase
     .from('current_puzzle')

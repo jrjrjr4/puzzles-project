@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+interface AuthMessage {
+  type: 'error' | 'success';
+  text: string;
+}
+
 export function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<AuthMessage | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setMessage(null);
     
     try {
       setLoading(true);
@@ -20,7 +25,10 @@ export function Auth() {
 
       if (error) throw error;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'An error occurred during sign in'
+      });
     } finally {
       setLoading(false);
     }
@@ -28,7 +36,7 @@ export function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setMessage(null);
     
     try {
       setLoading(true);
@@ -38,11 +46,16 @@ export function Auth() {
       });
 
       if (error) throw error;
-      else {
-        setError('Check your email for the confirmation link!');
-      }
+      
+      setMessage({
+        type: 'success',
+        text: 'Success! Check your email for the confirmation link.'
+      });
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'An error occurred during sign up'
+      });
     } finally {
       setLoading(false);
     }
@@ -51,7 +64,7 @@ export function Auth() {
   return (
     <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
       <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome to Chess Training</h2>
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email
@@ -78,13 +91,18 @@ export function Auth() {
             required
           />
         </div>
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-            {error}
+        {message && (
+          <div className={`text-sm p-2 rounded ${
+            message.type === 'error' 
+              ? 'text-red-600 bg-red-50' 
+              : 'text-green-600 bg-green-50'
+          }`}>
+            {message.text}
           </div>
         )}
         <div className="flex gap-4">
           <button
+            type="button"
             onClick={handleSignUp}
             disabled={loading}
             className="flex-1 bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 disabled:opacity-50"
@@ -92,6 +110,7 @@ export function Auth() {
             {loading ? 'Loading...' : 'Sign Up'}
           </button>
           <button
+            type="button"
             onClick={handleLogin}
             disabled={loading}
             className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
