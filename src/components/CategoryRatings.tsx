@@ -36,7 +36,7 @@ export default function CategoryRatings() {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 h-full w-full max-w-full">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2 sm:mb-0">Categories</h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Overall Rating</span>
@@ -67,10 +67,10 @@ export default function CategoryRatings() {
         </div>
       </div>
 
-      <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h3 className="text-sm font-medium text-green-600 mb-2 sm:mb-3">Strengths</h3>
-          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+          <h3 className="text-sm font-medium text-green-600 mb-4">Strengths</h3>
+          <div className="space-y-4">
             {strongestCategories.map((category) => (
               <CategoryCard
                 key={category.name}
@@ -85,9 +85,9 @@ export default function CategoryRatings() {
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-4 sm:pt-6">
-          <h3 className="text-sm font-medium text-orange-600 mb-2 sm:mb-3">Focus Areas</h3>
-          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+        <div className="md:border-l md:pl-6">
+          <h3 className="text-sm font-medium text-orange-600 mb-4">Focus Areas</h3>
+          <div className="space-y-4">
             {weakestCategories.map((category) => (
               <CategoryCard
                 key={category.name}

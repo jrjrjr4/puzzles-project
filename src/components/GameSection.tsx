@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Chessboard from './Chessboard';
 import CategoryRatings from './CategoryRatings';
@@ -14,6 +14,45 @@ export default function GameSection() {
   const [error, setError] = useState<string | null>(null);
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
+  const [rightPanelWidth, setRightPanelWidth] = useState(420);
+  const isDragging = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    // Prevent text selection while dragging
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging.current) return;
+    
+    // Calculate new width based on mouse position
+    const newWidth = Math.max(
+      380, // increased minimum width
+      Math.min(
+        800, // increased maximum width
+        window.innerWidth - e.clientX // distance from right edge
+      )
+    );
+    
+    setRightPanelWidth(newWidth);
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  // Clean up event listeners
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const loadNextPuzzle = async () => {
     try {
@@ -58,9 +97,9 @@ export default function GameSection() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-12rem)]">
-      <div className="flex-1 flex flex-col items-start">
-        <div className="w-full mb-4">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)]">
+      <div className="flex-1 flex flex-col items-start overflow-auto min-w-0">
+        <div className="w-full mb-4 flex justify-center">
           <button
             onClick={loadNextPuzzle}
             disabled={isLoading}
@@ -78,8 +117,20 @@ export default function GameSection() {
           <Chessboard />
         </div>
       </div>
-      <div className="w-full lg:w-[320px] flex-shrink-0">
-        <PuzzleInfo />
+
+      {/* Resizer handle */}
+      <div
+        className="hidden lg:block w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors"
+        onMouseDown={handleMouseDown}
+      />
+
+      <div 
+        className="w-full lg:flex-shrink-0 overflow-y-auto"
+        style={{ width: `${rightPanelWidth}px` }}
+      >
+        <div className="sticky top-0 bg-gray-50 z-10">
+          <PuzzleInfo />
+        </div>
         <CategoryRatings />
       </div>
     </div>
