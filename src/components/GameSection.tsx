@@ -14,7 +14,7 @@ export default function GameSection() {
   const [error, setError] = useState<string | null>(null);
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
-  const [rightPanelWidth, setRightPanelWidth] = useState(420);
+  const [rightPanelWidth, setRightPanelWidth] = useState(520);
   const isDragging = useRef(false);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -30,9 +30,9 @@ export default function GameSection() {
     
     // Calculate new width based on mouse position
     const newWidth = Math.max(
-      380, // increased minimum width
+      420, // increased minimum width to match better default
       Math.min(
-        800, // increased maximum width
+        800, // maximum width stays the same
         window.innerWidth - e.clientX // distance from right edge
       )
     );
@@ -97,9 +97,9 @@ export default function GameSection() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)]">
-      <div className="flex-1 flex flex-col items-start overflow-auto min-w-0">
-        <div className="w-full mb-4 flex justify-center">
+    <div className="flex flex-col lg:flex-row min-h-screen pb-8">
+      <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+        <div className="w-full mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
           <button
             onClick={loadNextPuzzle}
             disabled={isLoading}
@@ -113,8 +113,10 @@ export default function GameSection() {
             </div>
           )}
         </div>
-        <div className="w-full max-w-[800px] mx-auto">
-          <Chessboard />
+        <div className="w-full max-w-[600px] mx-auto p-4 flex items-center justify-center">
+          <div className="w-[85%]">
+            <Chessboard />
+          </div>
         </div>
       </div>
 
@@ -125,13 +127,15 @@ export default function GameSection() {
       />
 
       <div 
-        className="w-full lg:flex-shrink-0 overflow-y-auto"
+        className="w-full lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
         style={{ width: `${rightPanelWidth}px` }}
       >
         <div className="sticky top-0 bg-gray-50 z-10">
           <PuzzleInfo />
         </div>
-        <CategoryRatings />
+        <div className="pb-8">
+          <CategoryRatings />
+        </div>
       </div>
     </div>
   );
