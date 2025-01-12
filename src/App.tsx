@@ -1,19 +1,34 @@
-import React from 'react';
-import { Provider } from 'react-redux';
-import { store } from './store/store';
+import { useSelector } from 'react-redux';
+import { RootState } from './store/store';
+import { AuthProvider } from './providers/AuthProvider';
+import { Auth } from './components/Auth';
 import Header from './components/Header';
 import GameSection from './components/GameSection';
 
+function AppContent() {
+  const { user, loading } = useSelector((state: RootState) => state.auth);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      {user ? <GameSection /> : <Auth />}
+    </div>
+  );
+}
+
 function App() {
   return (
-    <Provider store={store}>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        <Header />
-        <main className="max-w-[1600px] mx-auto px-4 py-8">
-          <GameSection />
-        </main>
-      </div>
-    </Provider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
