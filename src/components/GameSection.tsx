@@ -58,9 +58,9 @@ export default function GameSection() {
   };
 
   return (
-    <div className="flex gap-8 min-h-[calc(100vh-12rem)]">
+    <div className="flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-12rem)]">
       <div className="flex-1 flex flex-col items-start">
-        <div className="w-full mb-6">
+        <div className="w-full mb-4">
           <button
             onClick={loadNextPuzzle}
             disabled={isLoading}
@@ -74,11 +74,11 @@ export default function GameSection() {
             </div>
           )}
         </div>
-        <div className="w-[min(100%,800px)]">
+        <div className="w-full max-w-[800px] mx-auto">
           <Chessboard />
         </div>
       </div>
-      <div className="w-[400px] flex-shrink-0">
+      <div className="w-full lg:w-[320px] flex-shrink-0">
         <PuzzleInfo />
         <CategoryRatings />
       </div>
