@@ -62,9 +62,9 @@ export function Auth() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome to Chess Training</h2>
-      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+    <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold text-center mb-6">Welcome to Chess Training</h2>
+      <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email
@@ -92,30 +92,25 @@ export function Auth() {
           />
         </div>
         {message && (
-          <div className={`text-sm p-2 rounded ${
-            message.type === 'error' 
-              ? 'text-red-600 bg-red-50' 
-              : 'text-green-600 bg-green-50'
-          }`}>
+          <div className={`p-3 rounded ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
             {message.text}
           </div>
         )}
         <div className="flex gap-4">
           <button
-            type="button"
-            onClick={handleSignUp}
+            type="submit"
             disabled={loading}
-            className="flex-1 bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            {loading ? 'Loading...' : 'Sign Up'}
+            {loading ? 'Loading...' : 'Sign In'}
           </button>
           <button
             type="button"
-            onClick={handleLogin}
+            onClick={handleSignUp}
             disabled={loading}
-            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            {loading ? 'Loading...' : 'Sign In'}
+            {loading ? 'Loading...' : 'Sign Up'}
           </button>
         </div>
       </form>

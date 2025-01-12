@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Session } from '@supabase/supabase-js';
 import { AppDispatch } from './store/store';
@@ -10,17 +10,17 @@ import { Auth } from './components/Auth';
 
 export default function App() {
   const dispatch = useDispatch<AppDispatch>();
-  const [session, setSession] = React.useState<Session | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session and load state if user is logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
       if (session) {
         dispatch(loadPersistedState());
       }
+      setLoading(false);
     });
 
     // Listen for auth changes
