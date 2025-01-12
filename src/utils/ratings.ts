@@ -6,48 +6,40 @@ const Q = Math.log(10) / 400;
 const K = 0.5; // System constant that affects rating changes
 
 interface RatingUpdate {
-  oldRating: number;
   newRating: number;
-  oldRD: number;
   newRD: number;
-  change: number;
 }
 
-export function calculateRatingChange(
-  playerRating: number,
-  playerRD: number,
+export function calculateNewRating(
+  userRating: number,
+  userRD: number,
   opponentRating: number,
   opponentRD: number,
-  score: number // 1 for win, 0 for loss, 0.5 for draw
+  score: boolean
 ): RatingUpdate {
-  // Calculate g(RD)
-  const g = 1 / Math.sqrt(1 + 3 * Q * Q * opponentRD * opponentRD / (Math.PI * Math.PI));
-  
-  // Calculate E (expected score)
-  const E = 1 / (1 + Math.pow(10, g * (opponentRating - playerRating) / 400));
-  
-  // Calculate d²
-  const d2 = 1 / (Q * Q * g * g * E * (1 - E));
-  
-  // Calculate rating change
-  const ratingChange = Q / (1 / (playerRD * playerRD) + 1 / d2) * g * (score - E);
-  
-  // Calculate new RD
-  const newRD = Math.sqrt(1 / (1 / (playerRD * playerRD) + 1 / d2));
-  
+  const q = Math.log(10) / 400;
+  const g = 1 / Math.sqrt(1 + 3 * q * q * (userRD * userRD + opponentRD * opponentRD) / (Math.PI * Math.PI));
+  const e = 1 / (1 + Math.pow(10, g * (opponentRating - userRating) / 400));
+  const d2 = 1 / (q * q * g * g * e * (1 - e));
+  const newRD = Math.sqrt(1 / (1 / (userRD * userRD) + 1 / d2));
+  const newRating = userRating + q * newRD * newRD * g * (score ? 1 - e : 0 - e);
+
   return {
-    oldRating: playerRating,
-    newRating: Math.round(playerRating + ratingChange),
-    oldRD: playerRD,
-    newRD: Math.round(newRD),
-    change: Math.round(ratingChange)
+    newRating,
+    newRD: Math.min(Math.max(newRD, 30), BASE_RD)
   };
 }
 
-export const calculateAverageRating = (categories: CategoryRating[]): number => {
-  return categories.reduce((sum, cat) => sum + cat.rating, 0) / categories.length;
-};
+export function calculateAverageRating(categories: { rating: number }[]): number {
+  if (categories.length === 0) return 1200;
+  return Math.round(
+    categories.reduce((sum, category) => sum + category.rating, 0) / categories.length
+  );
+}
 
-export const getMaxRating = (categories: CategoryRating[]): number => {
-  return Math.max(...categories.map(cat => cat.rating));
-};
+export function getRatingConfidence(ratingDeviation: number): string {
+  if (ratingDeviation <= 50) return 'Very High';
+  if (ratingDeviation <= 100) return 'High';
+  if (ratingDeviation <= 200) return 'Medium';
+  return 'Low';
+}
