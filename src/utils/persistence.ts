@@ -19,13 +19,13 @@ interface SeenPuzzleRow {
 }
 
 export async function saveUserRatings(ratings: UserRatings) {
-  const user = supabase.auth.getUser();
-  if (!user) return;
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return;
 
   const { error } = await supabase
     .from('user_ratings')
     .upsert({
-      id: (await user).data.user?.id,
+      user_id: user.data.user.id,
       overall_rating: ratings.overall.rating,
       overall_rating_deviation: ratings.overall.ratingDeviation,
       category_ratings: ratings.categories
@@ -37,13 +37,13 @@ export async function saveUserRatings(ratings: UserRatings) {
 }
 
 export async function loadUserRatings(): Promise<UserRatings | null> {
-  const user = supabase.auth.getUser();
-  if (!user) return null;
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return null;
 
   const { data, error } = await supabase
     .from('user_ratings')
     .select('*')
-    .eq('id', (await user).data.user?.id)
+    .eq('user_id', user.data.user.id)
     .single();
 
   if (error) {
@@ -63,30 +63,29 @@ export async function loadUserRatings(): Promise<UserRatings | null> {
 }
 
 export async function addSeenPuzzle(puzzleId: string) {
-  const user = supabase.auth.getUser();
-  if (!user) return;
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return;
 
   const { error } = await supabase
     .from('seen_puzzles')
     .insert({
-      id: crypto.randomUUID(),
-      user_id: (await user).data.user?.id,
+      user_id: user.data.user.id,
       puzzle_id: puzzleId
     });
 
-  if (error && !error.message.includes('unique constraint')) {
-    console.error('Error saving seen puzzle:', error);
+  if (error) {
+    console.error('Error adding seen puzzle:', error);
   }
 }
 
 export async function loadSeenPuzzles(): Promise<Set<string>> {
-  const user = supabase.auth.getUser();
-  if (!user) return new Set();
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return new Set();
 
   const { data, error } = await supabase
     .from('seen_puzzles')
     .select('puzzle_id')
-    .eq('user_id', (await user).data.user?.id);
+    .eq('user_id', user.data.user.id);
 
   if (error) {
     console.error('Error loading seen puzzles:', error);
@@ -96,14 +95,14 @@ export async function loadSeenPuzzles(): Promise<Set<string>> {
   return new Set(data.map((row: SeenPuzzleRow) => row.puzzle_id));
 }
 
-export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
-  const user = supabase.auth.getUser();
-  if (!user) return;
+export async function saveCurrentPuzzle(puzzle: Puzzle) {
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return;
 
   const { error } = await supabase
     .from('current_puzzle')
     .upsert({
-      user_id: (await user).data.user?.id,
+      user_id: user.data.user.id,
       puzzle_data: puzzle
     });
 
@@ -113,13 +112,13 @@ export async function saveCurrentPuzzle(puzzle: Puzzle | null) {
 }
 
 export async function loadCurrentPuzzle(): Promise<Puzzle | null> {
-  const user = supabase.auth.getUser();
-  if (!user) return null;
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return null;
 
   const { data, error } = await supabase
     .from('current_puzzle')
     .select('puzzle_data')
-    .eq('user_id', (await user).data.user?.id)
+    .eq('user_id', user.data.user.id)
     .single();
 
   if (error) {
