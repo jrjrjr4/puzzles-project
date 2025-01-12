@@ -22,7 +22,6 @@ export default function CategoryRatings() {
   }
 
   const averageRating = calculateAverageRating(categories);
-  console.log('Average rating:', averageRating);
 
   // Sort categories by actual user ratings
   const sortedCategories = [...categories].sort((a, b) => {
@@ -31,8 +30,8 @@ export default function CategoryRatings() {
     return ratingB - ratingA;
   });
 
-  const strongestCategories = sortedCategories.slice(0, 3);
-  const weakestCategories = sortedCategories.slice(-3).reverse();
+  const strongestCategories = sortedCategories.slice(0, 5);
+  const weakestCategories = sortedCategories.slice(-5).reverse();
 
   return (
     <div className="bg-white p-4 sm:p-6 h-full w-full max-w-full">
@@ -70,7 +69,7 @@ export default function CategoryRatings() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 className="text-sm font-medium text-green-600 mb-4">Strengths</h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {strongestCategories.map((category) => (
               <CategoryCard
                 key={category.name}
@@ -87,7 +86,7 @@ export default function CategoryRatings() {
 
         <div className="md:border-l md:pl-6">
           <h3 className="text-sm font-medium text-orange-600 mb-4">Focus Areas</h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {weakestCategories.map((category) => (
               <CategoryCard
                 key={category.name}

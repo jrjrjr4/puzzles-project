@@ -15,29 +15,28 @@ export default function GameSection() {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
   const [rightPanelWidth, setRightPanelWidth] = useState(520);
+  const [boardSize, setBoardSize] = useState(600);
   const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startSize = useRef(0);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
     isDragging.current = true;
+    startY.current = e.clientY;
+    startSize.current = boardSize;
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    // Prevent text selection while dragging
-    e.preventDefault();
   };
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging.current) return;
-    
-    // Calculate new width based on mouse position
-    const newWidth = Math.max(
-      420, // increased minimum width to match better default
-      Math.min(
-        800, // maximum width stays the same
-        window.innerWidth - e.clientX // distance from right edge
-      )
+    const deltaY = e.clientY - startY.current;
+    const newSize = Math.max(
+      400,
+      Math.min(800, startSize.current + deltaY)
     );
-    
-    setRightPanelWidth(newWidth);
+    setBoardSize(newSize);
   };
 
   const handleMouseUp = () => {
@@ -46,7 +45,6 @@ export default function GameSection() {
     document.removeEventListener('mouseup', handleMouseUp);
   };
 
-  // Clean up event listeners
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
@@ -58,29 +56,19 @@ export default function GameSection() {
     try {
       setIsLoading(true);
       setError(null);
-
-      console.log('Fetching puzzle CSV...');
       const response = await fetch('/filtered_puzzles.csv');
       if (!response.ok) {
         throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
       }
-
       const csvContent = await response.text();
-      console.log('Parsing puzzles...');
-      console.log('First few lines:', csvContent.split('\n').slice(0, 2));
-
       const puzzles = parsePuzzleCsv(csvContent);
-      console.log(`Parsed ${puzzles.length} puzzles`);
       
-      // Convert user ratings to the format expected by puzzle selector
       const themeRatings: { [theme: string]: number } = {};
       Object.entries(userRatings.categories).forEach(([theme, data]) => {
         themeRatings[theme] = data.rating;
       });
       
-      // Get next puzzle using our selection system
       const selectedPuzzle = getNextPuzzle(themeRatings, puzzles, usedPuzzleIds);
-      console.log('Selected puzzle:', selectedPuzzle);
 
       if (selectedPuzzle) {
         usedPuzzleIds.add(selectedPuzzle.id);
@@ -98,7 +86,7 @@ export default function GameSection() {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen pb-8">
-      <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+      <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
         <div className="w-full mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
           <button
             onClick={loadNextPuzzle}
@@ -113,20 +101,21 @@ export default function GameSection() {
             </div>
           )}
         </div>
-        <div className="w-full max-w-[600px] mx-auto p-4 flex items-center justify-center">
-          <div className="w-[85%]">
-            <Chessboard />
+        <div className="w-full flex items-center justify-center relative">
+          <div style={{ width: `${boardSize}px`, maxWidth: '100%' }} className="relative">
+            <Chessboard size={boardSize} />
+            {/* Resize handle */}
+            <div
+              className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group"
+              onMouseDown={handleMouseDown}
+            >
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 group-hover:bg-blue-400 transition-colors transform rotate-45" />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="flex lg:h-fit">
-        {/* Resizer handle */}
-        <div
-          className="hidden lg:block w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors"
-          onMouseDown={handleMouseDown}
-        />
-
         <div 
           className="w-full lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
           style={{ width: `${rightPanelWidth}px` }}

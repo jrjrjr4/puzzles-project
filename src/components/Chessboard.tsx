@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Chessboard as ReactChessboard } from 'react-chessboard';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store/store';
@@ -19,15 +19,17 @@ function formatRatingChange(oldRating: number, newRating: number): string {
   return `${Math.round(oldRating)} → ${Math.round(newRating)} (${sign}${change})`;
 }
 
-export default function Chessboard() {
+interface ChessboardProps {
+  size?: number;
+}
+
+export default function Chessboard({ size = 600 }: ChessboardProps) {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
   const [game, setGame] = useState(() => createChessGame());
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [puzzleStatus, setPuzzleStatus] = useState<'ongoing' | 'correct' | 'incorrect'>('ongoing');
   const [highlightedSquares, setHighlightedSquares] = useState<{ [square: string]: { backgroundColor: string } }>({});
   const [isAnimating, setIsAnimating] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [boardWidth, setBoardWidth] = useState(800);
   const [transitionDuration, setTransitionDuration] = useState(300);
   const dispatch = useDispatch();
   const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
@@ -109,19 +111,6 @@ export default function Chessboard() {
 
     setupPuzzle();
   }, [currentPuzzle]);
-
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const width = containerRef.current.offsetWidth;
-        setBoardWidth(Math.min(width, 800));
-      }
-    };
-
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
 
   function onDrop(sourceSquare: Square, targetSquare: Square, piece: Piece): boolean {
     if (!currentPuzzle || puzzleStatus !== 'ongoing' || isAnimating) return false;
@@ -263,11 +252,11 @@ export default function Chessboard() {
 
   return (
     <div className="space-y-4">
-      <div ref={containerRef} className="w-full aspect-square">
+      <div className="w-full aspect-square">
         <ReactChessboard
           position={game.fen()}
           onPieceDrop={onDrop}
-          boardWidth={boardWidth}
+          boardWidth={size}
           boardOrientation={boardOrientation}
           customSquareStyles={highlightedSquares}
           animationDuration={transitionDuration}
