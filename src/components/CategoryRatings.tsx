@@ -9,10 +9,18 @@ export default function CategoryRatings() {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   
-  // Defensive check for userRatings
-  if (!userRatings) {
-    console.warn('No user ratings found');
-    return null;
+  // Don't render anything until ratings are loaded
+  if (!userRatings.loaded || !userRatings.overall) {
+    return (
+      <div className="bg-white p-4 sm:p-6 h-full w-full max-w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2 sm:mb-0">Categories</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Loading ratings...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Ensure categories is defined and not empty

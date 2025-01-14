@@ -3,6 +3,7 @@ import { Puzzle } from '../../types/puzzle';
 import { calculateRatingChange, calculateAverageRating, BASE_RD } from '../../utils/ratings';
 import { themeToCategory } from '../../data/categories';
 import { supabase } from '../../utils/supabase';
+import { categories } from '../../data/categories';
 
 interface RatingWithDeviation {
   rating: number;
@@ -27,7 +28,8 @@ interface PuzzleState {
     themes: string[];
   };
   userRatings: {
-    overall: RatingWithDeviation;
+    loaded: boolean;
+    overall: RatingWithDeviation | null;
     categories: Record<string, RatingWithDeviation>;
   };
   lastRatingUpdates: {
@@ -39,7 +41,8 @@ interface PuzzleState {
 const initialState: PuzzleState = {
   currentPuzzle: null,
   userRatings: {
-    overall: { rating: 1200, ratingDeviation: BASE_RD },
+    loaded: false,
+    overall: null,
     categories: {},
   },
   lastRatingUpdates: null,
@@ -76,8 +79,8 @@ const puzzleSlice = createSlice({
       console.log('Success:', action.payload.success);
       console.log('User ID:', action.payload.userId || 'anonymous');
       
-      if (!state.currentPuzzle) {
-        console.warn('⚠️ No current puzzle, skipping rating update');
+      if (!state.currentPuzzle || !state.userRatings.overall) {
+        console.warn('⚠️ No current puzzle or ratings not loaded, skipping rating update');
         console.groupEnd();
         return;
       }
@@ -244,18 +247,32 @@ const puzzleSlice = createSlice({
         console.groupEnd();
       }
     },
-    loadUserRatings: (state, action: PayloadAction<{ ratings: PuzzleState['userRatings'] }>) => {
-      console.group('📥 Loading User Ratings');
-      console.log('Previous ratings:', JSON.stringify(state.userRatings, null, 2));
-      console.log('New ratings:', JSON.stringify(action.payload.ratings, null, 2));
+    loadUserRatings: (state, action: PayloadAction<{ ratings: any }>) => {
+      console.log('Loading user ratings:', JSON.stringify(action.payload.ratings, null, 2));
       
+      // For first-time users or when ratings are empty, set default ratings for all categories
+      const defaultRating = {
+        rating: 1200,
+        ratingDeviation: BASE_RD
+      };
+
+      // Get all category names from the categories array
+      const allCategories = categories.map((c: { name: string }) => c.name);
+      
+      // Create a default categories object with 1200 rating for each category
+      const defaultCategories: Record<string, RatingWithDeviation> = {};
+      allCategories.forEach((category: string) => {
+        defaultCategories[category] = { ...defaultRating };
+      });
+
       // Ensure we have valid ratings object with all required properties
       const newRatings = {
-        overall: {
-          rating: action.payload.ratings.overall?.rating ?? 1200,
-          ratingDeviation: action.payload.ratings.overall?.ratingDeviation ?? BASE_RD
-        },
-        categories: action.payload.ratings.categories ?? {}
+        loaded: true,
+        overall: action.payload.ratings.overall || defaultRating,
+        categories: {
+          ...defaultCategories,  // Start with default ratings for all categories
+          ...action.payload.ratings.categories  // Override with any existing ratings
+        }
       };
 
       // Update state
@@ -315,9 +332,17 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
       // If no record exists, create one with default ratings
       if (error.code === 'PGRST116') {
         console.log('Creating initial ratings record for user');
+        
+        // Create default ratings for all categories
+        const defaultRating = { rating: 1200, ratingDeviation: BASE_RD };
+        const defaultCategories: Record<string, RatingWithDeviation> = {};
+        categories.forEach((c: { name: string }) => {
+          defaultCategories[c.name] = { ...defaultRating };
+        });
+
         const defaultRatings = {
-          overall: { rating: 1200, ratingDeviation: 350 },
-          categories: {}
+          overall: defaultRating,
+          categories: defaultCategories
         };
         
         const { error: insertError } = await supabase

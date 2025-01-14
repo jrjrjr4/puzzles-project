@@ -18,10 +18,16 @@ export default function Header() {
         </div>
         <div className="w-1/3 flex justify-end">
           <div className="text-gray-600">
-            Rating: <span className="font-semibold">{Math.round(userRatings.overall.rating)}</span>
-            <span className="text-sm text-gray-500 ml-1">
-              ±{Math.round(userRatings.overall.ratingDeviation)}
-            </span>
+            Rating: {userRatings.loaded && userRatings.overall ? (
+              <>
+                <span className="font-semibold">{Math.round(userRatings.overall.rating)}</span>
+                <span className="text-sm text-gray-500 ml-1">
+                  ±{Math.round(userRatings.overall.ratingDeviation)}
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-400">Loading...</span>
+            )}
           </div>
         </div>
       </div>
