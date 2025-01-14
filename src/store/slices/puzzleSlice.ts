@@ -151,35 +151,90 @@ const puzzleSlice = createSlice({
         });
 
         state.lastRatingUpdates = updates;
-        console.log('Final rating updates:', updates);
+        console.log('Final ratings state:', JSON.stringify(state.userRatings, null, 2));
+
+        // Create a deep copy of the ratings for saving
+        const ratingsToSave = JSON.parse(JSON.stringify(state.userRatings));
 
         // Save to localStorage
-        console.log('💾 Saving to localStorage:', state.userRatings);
-        localStorage.setItem('chess_puzzle_ratings', JSON.stringify(state.userRatings));
+        try {
+          localStorage.setItem('chess_puzzle_ratings', JSON.stringify(ratingsToSave));
+          console.log('💾 Successfully saved to localStorage');
+        } catch (err) {
+          console.error('❌ Failed to save to localStorage:', err);
+        }
 
         // If user is logged in, save to Supabase
         if (action.payload.userId) {
           console.log('🔄 Saving to Supabase for user:', action.payload.userId);
+          
+          // Create a Promise to handle the async operation
           const saveRatings = async () => {
             try {
-              const { error } = await supabase
+              // Check if a record exists first
+              const { data: existingData, error: checkError } = await supabase
                 .from('user_ratings')
-                .upsert({
-                  user_id: action.payload.userId,
-                  ratings: state.userRatings,
-                  updated_at: new Date().toISOString()
-                });
+                .select('id')
+                .eq('user_id', action.payload.userId)
+                .single();
 
-              if (error) {
-                console.error('❌ Error saving ratings to Supabase:', error);
+              if (checkError && checkError.code !== 'PGRST116') {
+                console.error('❌ Error checking existing record:', checkError);
+                return;
+              }
+
+              if (existingData) {
+                // Update existing record
+                console.log('Updating existing record');
+                const { error: updateError } = await supabase
+                  .from('user_ratings')
+                  .update({
+                    ratings: ratingsToSave,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('user_id', action.payload.userId);
+
+                if (updateError) {
+                  console.error('❌ Error updating ratings:', updateError);
+                } else {
+                  console.log('✅ Successfully updated ratings in Supabase');
+                }
               } else {
-                console.log('✅ Successfully saved ratings to Supabase');
+                // Insert new record
+                console.log('Creating new record');
+                const { error: insertError } = await supabase
+                  .from('user_ratings')
+                  .insert({
+                    user_id: action.payload.userId,
+                    ratings: ratingsToSave,
+                    updated_at: new Date().toISOString()
+                  });
+
+                if (insertError) {
+                  console.error('❌ Error inserting ratings:', insertError);
+                } else {
+                  console.log('✅ Successfully inserted ratings in Supabase');
+                }
+              }
+
+              // Verify the save
+              const { data: verifyData, error: verifyError } = await supabase
+                .from('user_ratings')
+                .select('ratings')
+                .eq('user_id', action.payload.userId)
+                .single();
+
+              if (verifyError) {
+                console.error('❌ Error verifying save:', verifyError);
+              } else {
+                console.log('✅ Verified saved ratings:', verifyData.ratings);
               }
             } catch (err) {
               console.error('❌ Error in saveRatings:', err);
             }
           };
-          
+
+          // Execute the save operation
           saveRatings();
         }
 
@@ -191,9 +246,29 @@ const puzzleSlice = createSlice({
     },
     loadUserRatings: (state, action: PayloadAction<{ ratings: PuzzleState['userRatings'] }>) => {
       console.group('📥 Loading User Ratings');
-      console.log('Previous ratings:', state.userRatings);
-      console.log('New ratings:', action.payload.ratings);
-      state.userRatings = action.payload.ratings;
+      console.log('Previous ratings:', JSON.stringify(state.userRatings, null, 2));
+      console.log('New ratings:', JSON.stringify(action.payload.ratings, null, 2));
+      
+      // Ensure we have valid ratings object with all required properties
+      const newRatings = {
+        overall: {
+          rating: action.payload.ratings.overall?.rating ?? 1200,
+          ratingDeviation: action.payload.ratings.overall?.ratingDeviation ?? BASE_RD
+        },
+        categories: action.payload.ratings.categories ?? {}
+      };
+
+      // Update state
+      state.userRatings = newRatings;
+      
+      // Also save to localStorage as backup
+      try {
+        localStorage.setItem('chess_puzzle_ratings', JSON.stringify(newRatings));
+        console.log('✅ Saved ratings to localStorage');
+      } catch (err) {
+        console.error('❌ Failed to save to localStorage:', err);
+      }
+      
       console.groupEnd();
     }
   }
@@ -208,6 +283,21 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
   console.log('Fetching ratings for user:', userId);
   
   try {
+    // First, check if the table exists by trying to get the count
+    const { error: tableCheckError } = await supabase
+      .from('user_ratings')
+      .select('id', { count: 'exact', head: true });
+
+    if (tableCheckError) {
+      console.error('❌ Table check error:', {
+        message: tableCheckError.message,
+        details: tableCheckError.details,
+        hint: tableCheckError.hint
+      });
+      return;
+    }
+
+    // Then try to fetch the user's ratings
     const { data, error } = await supabase
       .from('user_ratings')
       .select('ratings')
@@ -215,7 +305,36 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
       .single();
 
     if (error) {
-      console.error('❌ Error fetching user ratings:', error);
+      console.error('❌ Error fetching user ratings:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      
+      // If no record exists, create one with default ratings
+      if (error.code === 'PGRST116') {
+        console.log('Creating initial ratings record for user');
+        const defaultRatings = {
+          overall: { rating: 1200, ratingDeviation: 350 },
+          categories: {}
+        };
+        
+        const { error: insertError } = await supabase
+          .from('user_ratings')
+          .insert({
+            user_id: userId,
+            ratings: defaultRatings,
+            updated_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('❌ Error creating initial ratings:', insertError);
+        } else {
+          console.log('✅ Created initial ratings');
+          dispatch(loadUserRatings({ ratings: defaultRatings }));
+        }
+      }
       return;
     }
 

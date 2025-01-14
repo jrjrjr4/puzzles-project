@@ -20,6 +20,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         console.log('Loading ratings for user:', session.user.id);
         dispatch(fetchUserRatings(session.user.id));
+      } else {
+        // Load from localStorage for anonymous users
+        console.log('Loading ratings from localStorage for anonymous user');
+        const savedRatings = localStorage.getItem('chess_puzzle_ratings');
+        if (savedRatings) {
+          try {
+            const parsedRatings = JSON.parse(savedRatings);
+            console.log('Found saved ratings:', parsedRatings);
+            dispatch(loadUserRatings({ ratings: parsedRatings }));
+          } catch (err) {
+            console.error('❌ Error parsing saved ratings:', err);
+            // Use default ratings if parsing fails
+            dispatch(loadUserRatings({
+              ratings: {
+                overall: { rating: 1200, ratingDeviation: 350 },
+                categories: {}
+              }
+            }));
+          }
+        } else {
+          console.log('No saved ratings found, using defaults');
+          dispatch(loadUserRatings({
+            ratings: {
+              overall: { rating: 1200, ratingDeviation: 350 },
+              categories: {}
+            }
+          }));
+        }
       }
       dispatch(setLoading(false));
     });
@@ -38,13 +66,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('👤 User logged in - loading ratings for:', session.user.id);
         dispatch(fetchUserRatings(session.user.id));
       } else {
-        console.log('👋 User logged out - resetting to default ratings');
-        dispatch(loadUserRatings({
-          ratings: {
-            overall: { rating: 1200, ratingDeviation: 350 },
-            categories: {}
+        console.log('👋 User logged out - loading from localStorage');
+        const savedRatings = localStorage.getItem('chess_puzzle_ratings');
+        if (savedRatings) {
+          try {
+            const parsedRatings = JSON.parse(savedRatings);
+            console.log('Found saved ratings:', parsedRatings);
+            dispatch(loadUserRatings({ ratings: parsedRatings }));
+          } catch (err) {
+            console.error('❌ Error parsing saved ratings:', err);
+            // Use default ratings if parsing fails
+            dispatch(loadUserRatings({
+              ratings: {
+                overall: { rating: 1200, ratingDeviation: 350 },
+                categories: {}
+              }
+            }));
           }
-        }));
+        } else {
+          console.log('No saved ratings found, using defaults');
+          dispatch(loadUserRatings({
+            ratings: {
+              overall: { rating: 1200, ratingDeviation: 350 },
+              categories: {}
+            }
+          }));
+        }
       }
       console.groupEnd();
     });
