@@ -32,6 +32,7 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
   const [highlightedSquares, setHighlightedSquares] = useState<{ [square: string]: { backgroundColor: string } }>({});
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(300);
+  const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
   const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
 
@@ -49,69 +50,65 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
           setTransitionDuration(0);
           setIsAnimating(false);
           
-          // Create new game and set position immediately
-          const newGame = createChessGame(currentPuzzle.fen);
+          // Reset the game with the puzzle position
+          const newGame = createChessGame();
+          newGame.load(currentPuzzle.fen);
           setGame(newGame);
-          
-          // Clear any existing highlights
-          setHighlightedSquares({});
-          setPuzzleStatus('ongoing');
           setCurrentMoveIndex(1);
-          
-          // Wait a brief moment to ensure the initial position is set
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Then set up the animation for the opponent's first move
-          const firstMove = currentPuzzle.moves[0];
-          const [from, to] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
-          
-          // Set the animation duration for the piece movement
-          setTransitionDuration(300);
-          
-          // Brief wait before the move
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          // Make opponent's first move with animation
-          setIsAnimating(true);
-          const moveResult = newGame.move({ 
-            from, 
-            to, 
-            promotion: firstMove.length > 4 ? firstMove[4] : undefined 
-          });
-          
-          // Highlight the squares of opponent's move
-          setHighlightedSquares({
-            [from]: HIGHLIGHT_COLOR,
-            [to]: HIGHLIGHT_COLOR
-          });
-
-          if (moveResult) {
-            setGame(newGame);
-          }
-
-          // Clear animation state after move
-          setTimeout(() => {
-            setIsAnimating(false);
-          }, 300);
-        } else {
-          // Reset to initial state if no puzzle
-          setTransitionDuration(0);
-          setGame(createChessGame());
-          setHighlightedSquares({});
           setPuzzleStatus('ongoing');
-          setIsAnimating(false);
+          setHighlightedSquares({});
+          
+          // Make the first move (opponent's move)
+          const firstMove = currentPuzzle.moves[0];
+          await new Promise(resolve => setTimeout(resolve, 100));
+          newGame.move({
+            from: firstMove.slice(0, 2),
+            to: firstMove.slice(2, 4),
+            promotion: firstMove[4]
+          });
+          
+          // Highlight the move
+          setHighlightedSquares({
+            [firstMove.slice(0, 2)]: HIGHLIGHT_COLOR,
+            [firstMove.slice(2, 4)]: HIGHLIGHT_COLOR
+          });
+          
+          // Re-enable animations
+          setTransitionDuration(300);
+          setGame(newGame);
         }
       } catch (error) {
         console.error('Error setting up puzzle:', error);
-        setGame(createChessGame());
-        setHighlightedSquares({});
-        setPuzzleStatus('ongoing');
-        setIsAnimating(false);
+      } finally {
+        setIsLoading(false);
       }
     }
 
     setupPuzzle();
   }, [currentPuzzle]);
+
+  // Don't show anything until we have loaded the initial state
+  if (isLoading) {
+    return (
+      <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-gray-500">Loading puzzle...</div>
+      </div>
+    );
+  }
+
+  // Show welcome message only for true first-time users (not during loading)
+  if (!isLoading && !currentPuzzle && !localStorage.getItem('has_played')) {
+    // Mark that the user has seen the welcome message
+    localStorage.setItem('has_played', 'true');
+    return (
+      <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-center p-8">
+          <h3 className="text-xl font-semibold text-gray-700 mb-4">Welcome to Chess Puzzles!</h3>
+          <p className="text-gray-600 mb-4">Click "Load Next Puzzle" to start solving puzzles and improving your chess skills.</p>
+        </div>
+      </div>
+    );
+  }
 
   function onDrop(sourceSquare: Square, targetSquare: Square, piece: Piece): boolean {
     if (!currentPuzzle || puzzleStatus !== 'ongoing' || isAnimating) return false;
