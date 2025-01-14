@@ -4,15 +4,17 @@ import Chessboard from './Chessboard';
 import CategoryRatings from './CategoryRatings';
 import PuzzleInfo from './PuzzleInfo';
 import { parsePuzzleCsv } from '../utils/puzzles';
-import { setCurrentPuzzle } from '../store/slices/puzzleSlice';
+import { setCurrentPuzzle, loadLastPuzzle, saveCurrentPuzzle, fetchLastPuzzle } from '../store/slices/puzzleSlice';
 import { getNextPuzzle } from '../utils/puzzleSelector';
-import { RootState } from '../store/store';
+import { RootState, AppDispatch } from '../store/store';
 
 export default function GameSection() {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
+  const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+  const user = useSelector((state: RootState) => state.auth.user);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
   const [rightPanelWidth, setRightPanelWidth] = useState(520);
   const [boardSize, setBoardSize] = useState(0);
@@ -20,6 +22,20 @@ export default function GameSection() {
   const startY = useRef(0);
   const startSize = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Load the last puzzle on mount
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(fetchLastPuzzle(user.id));
+    }
+  }, [dispatch, user?.id]);
+
+  // Save puzzle when it changes
+  useEffect(() => {
+    if (user?.id && currentPuzzle) {
+      dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
+    }
+  }, [dispatch, user?.id, currentPuzzle]);
 
   // Calculate initial board size and update on window resize
   useEffect(() => {
@@ -48,10 +64,7 @@ export default function GameSection() {
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging.current) return;
     const deltaY = e.clientY - startY.current;
-    const newSize = Math.max(
-      300,
-      Math.min(800, startSize.current + deltaY)
-    );
+    const newSize = Math.max(300, Math.min(800, startSize.current - deltaY));
     setBoardSize(newSize);
   };
 
@@ -61,17 +74,11 @@ export default function GameSection() {
     document.removeEventListener('mouseup', handleMouseUp);
   };
 
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
   const loadNextPuzzle = async () => {
     try {
       setIsLoading(true);
       setError(null);
+      
       const response = await fetch('/filtered_puzzles.csv');
       if (!response.ok) {
         throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);

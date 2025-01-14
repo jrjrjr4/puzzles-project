@@ -57,6 +57,7 @@ const puzzleSlice = createSlice({
       
       if (!action.payload) {
         console.warn('Attempted to set null puzzle');
+        state.currentPuzzle = null;
         return;
       }
       
@@ -73,6 +74,10 @@ const puzzleSlice = createSlice({
         console.error('Error setting current puzzle:', error);
         state.currentPuzzle = null;
       }
+    },
+    loadLastPuzzle: (state) => {
+      // This is now just a placeholder - actual loading happens in the thunk
+      console.log('Loading last puzzle from state');
     },
     updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean; userId?: string }>) => {
       console.group('🎯 Updating Ratings After Puzzle');
@@ -291,7 +296,7 @@ const puzzleSlice = createSlice({
   }
 });
 
-export const { setCurrentPuzzle, updateRatingsAfterPuzzle, loadUserRatings } = puzzleSlice.actions;
+export const { setCurrentPuzzle, updateRatingsAfterPuzzle, loadUserRatings, loadLastPuzzle } = puzzleSlice.actions;
 export default puzzleSlice.reducer;
 
 // Add async thunk to load ratings
@@ -373,5 +378,65 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
     console.error('❌ Error in fetchUserRatings:', err);
   } finally {
     console.groupEnd();
+  }
+};
+
+// Add async thunk to save current puzzle
+export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPuzzle']) => async () => {
+  if (!userId) {
+    console.log('No user ID provided, skipping puzzle save');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('user_current_puzzle')
+      .upsert({
+        user_id: userId,
+        puzzle_data: puzzle,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      console.error('Error saving current puzzle:', error);
+    } else {
+      console.log('Successfully saved current puzzle');
+    }
+  } catch (err) {
+    console.error('Error in saveCurrentPuzzle:', err);
+  }
+};
+
+// Add async thunk to fetch last puzzle
+export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
+  if (!userId) {
+    console.log('No user ID provided, skipping puzzle fetch');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('user_current_puzzle')
+      .select('puzzle_data')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log('No saved puzzle found');
+      } else {
+        console.error('Error fetching last puzzle:', error);
+      }
+      return;
+    }
+
+    if (data?.puzzle_data) {
+      console.log('Restored last puzzle:', data.puzzle_data);
+      dispatch(setCurrentPuzzle(data.puzzle_data));
+    }
+  } catch (err) {
+    console.error('Error in fetchLastPuzzle:', err);
   }
 };
