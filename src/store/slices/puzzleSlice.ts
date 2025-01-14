@@ -166,8 +166,22 @@ const puzzleSlice = createSlice({
 
         // Save to localStorage
         try {
+          // Save to general localStorage for anonymous users
           localStorage.setItem('chess_puzzle_ratings', JSON.stringify(ratingsToSave));
           console.log('💾 Successfully saved to localStorage');
+          
+          // If this is a guest user, also save to their specific storage
+          if (action.payload.userId) {
+            // Check if guest and save to specific storage
+            const saveGuestRatings = async () => {
+              const user = await supabase.auth.getUser();
+              if (user.data.user?.user_metadata?.is_guest) {
+                localStorage.setItem(`guest_ratings_${action.payload.userId}`, JSON.stringify(ratingsToSave));
+                console.log('💾 Successfully saved guest ratings to localStorage');
+              }
+            };
+            saveGuestRatings();
+          }
         } catch (err) {
           console.error('❌ Failed to save to localStorage:', err);
         }
@@ -383,60 +397,80 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
 
 // Add async thunk to save current puzzle
 export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPuzzle']) => async () => {
-  if (!userId) {
-    console.log('No user ID provided, skipping puzzle save');
-    return;
-  }
+  if (!puzzle) return;
+
+  console.log('Saving current puzzle:', puzzle.id, 'for user:', userId);
 
   try {
+    // Check if this is a guest user
+    const { data: { user } } = await supabase.auth.getUser();
+    const isGuest = user?.user_metadata?.is_guest;
+
+    if (isGuest) {
+      // Save to guest-specific localStorage
+      localStorage.setItem(`guest_last_puzzle_${userId}`, JSON.stringify(puzzle));
+      console.log('💾 Saved last puzzle to guest localStorage');
+    }
+
+    // Save to Supabase
     const { error } = await supabase
-      .from('user_current_puzzle')
+      .from('user_progress')
       .upsert({
         user_id: userId,
-        puzzle_data: puzzle,
+        last_puzzle: puzzle,
         updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
       });
 
     if (error) {
-      console.error('Error saving current puzzle:', error);
+      console.error('❌ Error saving current puzzle:', error);
     } else {
-      console.log('Successfully saved current puzzle');
+      console.log('✅ Successfully saved current puzzle to Supabase');
     }
-  } catch (err) {
-    console.error('Error in saveCurrentPuzzle:', err);
+  } catch (error) {
+    console.error('❌ Error in saveCurrentPuzzle:', error);
   }
 };
 
 // Add async thunk to fetch last puzzle
 export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
-  if (!userId) {
-    console.log('No user ID provided, skipping puzzle fetch');
-    return;
-  }
+  console.log('Fetching last puzzle for user:', userId);
 
   try {
+    // Check if this is a guest user
+    const { data: { user } } = await supabase.auth.getUser();
+    const isGuest = user?.user_metadata?.is_guest;
+
+    if (isGuest) {
+      // Try to load from guest-specific localStorage first
+      const savedPuzzle = localStorage.getItem(`guest_last_puzzle_${userId}`);
+      if (savedPuzzle) {
+        const puzzle = JSON.parse(savedPuzzle);
+        console.log('📖 Loaded last puzzle from guest localStorage:', puzzle);
+        dispatch(setCurrentPuzzle(puzzle));
+        return;
+      }
+    }
+
+    // If not a guest or no saved puzzle, fetch from Supabase
     const { data, error } = await supabase
-      .from('user_current_puzzle')
-      .select('puzzle_data')
+      .from('user_progress')
+      .select('last_puzzle')
       .eq('user_id', userId)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        console.log('No saved puzzle found');
-      } else {
-        console.error('Error fetching last puzzle:', error);
-      }
+      console.error('❌ Error fetching last puzzle:', error);
       return;
     }
 
-    if (data?.puzzle_data) {
-      console.log('Restored last puzzle:', data.puzzle_data);
-      dispatch(setCurrentPuzzle(data.puzzle_data));
+    if (data?.last_puzzle) {
+      console.log('📖 Loaded last puzzle from Supabase:', data.last_puzzle);
+      dispatch(setCurrentPuzzle(data.last_puzzle));
+    } else {
+      console.log('No last puzzle found');
+      dispatch(setCurrentPuzzle(null));
     }
-  } catch (err) {
-    console.error('Error in fetchLastPuzzle:', err);
+  } catch (error) {
+    console.error('❌ Error in fetchLastPuzzle:', error);
   }
 };

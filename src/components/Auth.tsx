@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { supabase } from '../utils/supabase';
 import { setError } from '../store/slices/authSlice';
+import { setUser } from '../store/slices/authSlice';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
@@ -45,32 +46,33 @@ export function Auth() {
   const handleGuestLogin = async () => {
     try {
       setLoading(true);
-      // Generate a unique guest ID using timestamp and random string
+      
+      // Generate a unique guest ID
       const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const guestEmail = `${guestId}@guest.chess`;
-      const guestPassword = Math.random().toString(36).substring(2, 15);
+      
+      // Create default ratings for the guest
+      const defaultRatings = {
+        loaded: true,
+        overall: { rating: 1200, ratingDeviation: 350 },
+        categories: {}
+      };
 
-      // Create a new guest account
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: guestEmail,
-        password: guestPassword,
-        options: {
-          data: {
-            is_guest: true,
-            guest_id: guestId
-          }
-        }
-      });
-
-      if (signUpError) throw signUpError;
-
-      // Immediately sign in with the created guest account
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: guestEmail,
-        password: guestPassword,
-      });
-
-      if (signInError) throw signInError;
+      // Store guest data in localStorage
+      localStorage.setItem('guestCredentials', JSON.stringify({
+        id: guestId,
+        isGuest: true
+      }));
+      
+      // Store initial ratings
+      localStorage.setItem(`guest_ratings_${guestId}`, JSON.stringify(defaultRatings));
+      
+      // Dispatch the guest user to Redux
+      dispatch(setUser({
+        id: guestId,
+        user_metadata: { is_guest: true },
+        email: null,
+        role: 'guest'
+      } as any));
 
     } catch (error) {
       dispatch(setError((error as Error).message));

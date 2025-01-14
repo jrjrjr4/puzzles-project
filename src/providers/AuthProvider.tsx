@@ -10,79 +10,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>();
   const ratingsLoaded = useRef(false);
 
-  const loadRatings = (session: Session | null) => {
+  const loadRatings = async (session: Session | null) => {
     if (ratingsLoaded.current) {
       console.log('Ratings already loaded, skipping');
       return;
     }
 
     if (session?.user) {
-      console.log('Loading ratings for user:', session.user.id);
+      // Check if this is a guest user
+      const isGuest = session.user.user_metadata?.is_guest;
+      console.log('Loading ratings for user:', session.user.id, isGuest ? '(guest)' : '');
+      
+      if (isGuest) {
+        // For guest users, try to load from localStorage first
+        const savedRatings = localStorage.getItem(`guest_ratings_${session.user.id}`);
+        if (savedRatings) {
+          try {
+            const parsedRatings = JSON.parse(savedRatings);
+            console.log('Found saved guest ratings:', parsedRatings);
+            dispatch(loadUserRatings({ ratings: parsedRatings }));
+            return;
+          } catch (err) {
+            console.error('❌ Error parsing saved guest ratings:', err);
+          }
+        }
+      }
+      
+      // If not a guest or no saved ratings, fetch from Supabase
       dispatch(fetchUserRatings(session.user.id));
     } else {
-      // Load from localStorage for anonymous users
-      console.log('Loading ratings from localStorage for anonymous user');
-      const savedRatings = localStorage.getItem('chess_puzzle_ratings');
-      if (savedRatings) {
-        try {
-          const parsedRatings = JSON.parse(savedRatings);
-          console.log('Found saved ratings:', parsedRatings);
-          dispatch(loadUserRatings({ ratings: parsedRatings }));
-        } catch (err) {
-          console.error('❌ Error parsing saved ratings:', err);
-          // Use default ratings if parsing fails
-          dispatch(loadUserRatings({
-            ratings: {
-              overall: { rating: 1200, ratingDeviation: 350 },
-              categories: {}
-            }
-          }));
+      // Clear any existing ratings from localStorage when logged out
+      localStorage.removeItem('chess_puzzle_ratings');
+      
+      // Set default ratings for anonymous users
+      console.log('Setting default ratings for anonymous user');
+      dispatch(loadUserRatings({
+        ratings: {
+          overall: { rating: 1200, ratingDeviation: 350 },
+          categories: {}
         }
-      } else {
-        console.log('No saved ratings found, using defaults');
-        dispatch(loadUserRatings({
-          ratings: {
-            overall: { rating: 1200, ratingDeviation: 350 },
-            categories: {}
-          }
-        }));
-      }
+      }));
     }
     ratingsLoaded.current = true;
-  };
+  }
 
   useEffect(() => {
-    console.group('🔐 Auth Provider Initialization');
-    
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session ? 'User logged in' : 'No session');
-      dispatch(setUser(session?.user ?? null));
-      loadRatings(session);
+    console.log('🔐 Auth Provider Initialization');
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth State Change');
+      console.log('Event:', event);
+      console.log('Session:', session ? 'User logged in' : 'User logged out');
+
+      // Reset ratingsLoaded flag on sign in/out to ensure fresh load
+      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+        localStorage.removeItem('chess_puzzle_ratings');
+        ratingsLoaded.current = false;
+      }
+
+      dispatch(setLoading(true));
+      dispatch(setUser(session?.user || null));
+      await loadRatings(session);
       dispatch(setLoading(false));
     });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.group('🔄 Auth State Change');
-      console.log('Event:', _event);
-      console.log('Session:', session ? 'User logged in' : 'User logged out');
-      
-      dispatch(setUser(session?.user ?? null));
-      
-      // Only reload ratings if the auth state actually changed (login/logout)
-      if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
-        ratingsLoaded.current = false; // Reset the flag
-        loadRatings(session);
-      }
-      
-      console.groupEnd();
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session ? 'Session found' : 'No session');
+      dispatch(setUser(session?.user || null));
+      loadRatings(session);
     });
 
-    console.groupEnd();
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [dispatch]);
 
   return <>{children}</>;
