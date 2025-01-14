@@ -39,7 +39,18 @@ function computeThemeProbabilities(userThemeRatings: UserThemeRatings): { [theme
     const themeScores: { [theme: string]: number } = {};
     
     // First, ensure all themes have a base score
-    const allThemes = ['Mate', 'Endgame', 'Defense', 'Quiet Move', 'Capturing Defender', 'Fork'];
+    const allThemes = [
+        'Mate', 
+        'Endgame', 
+        'Defense', 
+        'Quiet Move', 
+        'Capturing Defender', 
+        'Fork',
+        'Discovered Attack',
+        'Deflection',
+        'Pin',
+        'Kingside Attack'
+    ];
     allThemes.forEach(theme => {
         if (theme in userThemeRatings) {
             // For rated themes, prefer those with lower ratings
