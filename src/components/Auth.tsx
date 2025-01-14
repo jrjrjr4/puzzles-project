@@ -42,6 +42,43 @@ export function Auth() {
     }
   };
 
+  const handleGuestLogin = async () => {
+    try {
+      setLoading(true);
+      // Generate a unique guest ID using timestamp and random string
+      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const guestEmail = `${guestId}@guest.chess`;
+      const guestPassword = Math.random().toString(36).substring(2, 15);
+
+      // Create a new guest account
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: guestEmail,
+        password: guestPassword,
+        options: {
+          data: {
+            is_guest: true,
+            guest_id: guestId
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+
+      // Immediately sign in with the created guest account
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: guestEmail,
+        password: guestPassword,
+      });
+
+      if (signInError) throw signInError;
+
+    } catch (error) {
+      dispatch(setError((error as Error).message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
@@ -103,6 +140,22 @@ export function Auth() {
               className="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-blue-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
             >
               {loading ? 'Loading...' : 'Sign up'}
+            </button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-white px-2 text-gray-500">or</span>
+              </div>
+            </div>
+            <button
+              onClick={handleGuestLogin}
+              disabled={loading}
+              type="button"
+              className="flex w-full justify-center rounded-md bg-gray-50 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-100"
+            >
+              {loading ? 'Loading...' : 'Continue as Guest'}
             </button>
           </div>
         </form>
