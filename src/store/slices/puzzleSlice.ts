@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Puzzle } from '../../types/puzzle';
 import { calculateRatingChange, calculateAverageRating, BASE_RD } from '../../utils/ratings';
 import { themeToCategory } from '../../data/categories';
+import { supabase } from '../../utils/supabase';
 
 interface RatingWithDeviation {
   rating: number;
@@ -70,19 +71,25 @@ const puzzleSlice = createSlice({
         state.currentPuzzle = null;
       }
     },
-    updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean }>) => {
-      console.log('Updating ratings after puzzle. Success:', action.payload.success);
+    updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean; userId?: string }>) => {
+      console.group('🎯 Updating Ratings After Puzzle');
+      console.log('Success:', action.payload.success);
+      console.log('User ID:', action.payload.userId || 'anonymous');
       
       if (!state.currentPuzzle) {
-        console.log('No current puzzle, skipping rating update');
+        console.warn('⚠️ No current puzzle, skipping rating update');
+        console.groupEnd();
         return;
       }
 
       try {
         const score = action.payload.success ? 1 : 0;
-        console.log('Current puzzle themes:', state.currentPuzzle.themes);
+        console.log('Puzzle details:', {
+          id: state.currentPuzzle.id,
+          rating: state.currentPuzzle.rating,
+          themes: state.currentPuzzle.themes
+        });
         
-        // The themes are already mapped in parsePuzzleCsv, so we can use them directly
         const categoriesToUpdate = state.currentPuzzle.themes.length > 0 
           ? state.currentPuzzle.themes 
           : ['Tactics'];
@@ -147,15 +154,80 @@ const puzzleSlice = createSlice({
         console.log('Final rating updates:', updates);
 
         // Save to localStorage
-        console.log('Saving ratings to localStorage:', state.userRatings);
+        console.log('💾 Saving to localStorage:', state.userRatings);
         localStorage.setItem('chess_puzzle_ratings', JSON.stringify(state.userRatings));
 
+        // If user is logged in, save to Supabase
+        if (action.payload.userId) {
+          console.log('🔄 Saving to Supabase for user:', action.payload.userId);
+          const saveRatings = async () => {
+            try {
+              const { error } = await supabase
+                .from('user_ratings')
+                .upsert({
+                  user_id: action.payload.userId,
+                  ratings: state.userRatings,
+                  updated_at: new Date().toISOString()
+                });
+
+              if (error) {
+                console.error('❌ Error saving ratings to Supabase:', error);
+              } else {
+                console.log('✅ Successfully saved ratings to Supabase');
+              }
+            } catch (err) {
+              console.error('❌ Error in saveRatings:', err);
+            }
+          };
+          
+          saveRatings();
+        }
+
       } catch (error) {
-        console.error('Error updating ratings:', error);
+        console.error('❌ Error updating ratings:', error);
+      } finally {
+        console.groupEnd();
       }
+    },
+    loadUserRatings: (state, action: PayloadAction<{ ratings: PuzzleState['userRatings'] }>) => {
+      console.group('📥 Loading User Ratings');
+      console.log('Previous ratings:', state.userRatings);
+      console.log('New ratings:', action.payload.ratings);
+      state.userRatings = action.payload.ratings;
+      console.groupEnd();
     }
   }
 });
 
-export const { setCurrentPuzzle, updateRatingsAfterPuzzle } = puzzleSlice.actions;
+export const { setCurrentPuzzle, updateRatingsAfterPuzzle, loadUserRatings } = puzzleSlice.actions;
 export default puzzleSlice.reducer;
+
+// Add async thunk to load ratings
+export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
+  console.group('🔄 Fetching User Ratings');
+  console.log('Fetching ratings for user:', userId);
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_ratings')
+      .select('ratings')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error fetching user ratings:', error);
+      return;
+    }
+
+    if (data?.ratings) {
+      console.log('✅ Successfully loaded ratings from Supabase:', data.ratings);
+      dispatch(loadUserRatings({ ratings: data.ratings }));
+    } else {
+      console.log('ℹ️ No existing ratings found for user');
+    }
+  } catch (err) {
+    console.error('❌ Error in fetchUserRatings:', err);
+  } finally {
+    console.groupEnd();
+  }
+};

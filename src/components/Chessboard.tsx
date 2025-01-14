@@ -25,6 +25,7 @@ interface ChessboardProps {
 
 export default function Chessboard({ size = 600 }: ChessboardProps) {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+  const user = useSelector((state: RootState) => state.auth.user);
   const [game, setGame] = useState(() => createChessGame());
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [puzzleStatus, setPuzzleStatus] = useState<'ongoing' | 'correct' | 'incorrect'>('ongoing');
@@ -137,7 +138,7 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
       if (moveString !== expectedMove) {
         setPuzzleStatus('incorrect');
         console.log('Dispatching rating update for incorrect move');
-        dispatch(updateRatingsAfterPuzzle({ success: false }));
+        dispatch(updateRatingsAfterPuzzle({ success: false, userId: user?.id }));
         return true;
       }
 
@@ -145,7 +146,7 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
       if (currentMoveIndex === currentPuzzle.moves.length - 1) {
         setPuzzleStatus('correct');
         console.log('Dispatching rating update for correct puzzle completion');
-        dispatch(updateRatingsAfterPuzzle({ success: true }));
+        dispatch(updateRatingsAfterPuzzle({ success: true, userId: user?.id }));
         return true;
       }
 
