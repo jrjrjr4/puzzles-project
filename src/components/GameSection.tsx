@@ -15,10 +15,26 @@ export default function GameSection() {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
   const [rightPanelWidth, setRightPanelWidth] = useState(520);
-  const [boardSize, setBoardSize] = useState(600);
+  const [boardSize, setBoardSize] = useState(0);
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startSize = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate initial board size and update on window resize
+  useEffect(() => {
+    const calculateBoardSize = () => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.offsetWidth;
+      const isMobile = window.innerWidth < 768;
+      const maxSize = isMobile ? Math.min(containerWidth - 32, window.innerHeight - 200) : 600;
+      setBoardSize(maxSize);
+    };
+
+    calculateBoardSize();
+    window.addEventListener('resize', calculateBoardSize);
+    return () => window.removeEventListener('resize', calculateBoardSize);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -33,7 +49,7 @@ export default function GameSection() {
     if (!isDragging.current) return;
     const deltaY = e.clientY - startY.current;
     const newSize = Math.max(
-      400,
+      300,
       Math.min(800, startSize.current + deltaY)
     );
     setBoardSize(newSize);
@@ -101,12 +117,12 @@ export default function GameSection() {
             </div>
           )}
         </div>
-        <div className="w-full flex items-center justify-center relative">
-          <div style={{ width: `${boardSize}px`, maxWidth: '100%' }} className="relative">
-            <Chessboard size={boardSize} />
-            {/* Resize handle */}
+        <div ref={containerRef} className="w-full flex items-center justify-center relative px-4">
+          <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
+            {boardSize > 0 && <Chessboard size={boardSize} />}
+            {/* Hide resize handle on mobile */}
             <div
-              className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group"
+              className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group hidden md:block"
               onMouseDown={handleMouseDown}
             >
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 group-hover:bg-blue-400 transition-colors transform rotate-45" />
@@ -115,9 +131,9 @@ export default function GameSection() {
         </div>
       </div>
 
-      <div className="flex lg:h-fit">
+      <div className="flex lg:h-fit mt-4 lg:mt-0">
         <div 
-          className="w-full lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
+          className="w-full lg:w-auto lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
           style={{ width: `${rightPanelWidth}px` }}
         >
           <div className="sticky top-0 bg-gray-50 z-10">
