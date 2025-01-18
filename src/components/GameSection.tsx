@@ -141,11 +141,14 @@ export default function GameSection() {
         <div 
           className="w-full overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
         >
-          <div className="sticky top-0 bg-gray-50 z-10">
+          <div className="hidden md:block sticky top-0 bg-gray-50 z-10">
             <PuzzleInfo />
           </div>
           <div className="pb-4 md:pb-8">
             <CategoryRatings />
+          </div>
+          <div className="md:hidden bg-gray-50">
+            <PuzzleInfo />
           </div>
         </div>
       </div>
