@@ -98,9 +98,6 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
           ) : (
             <div className="text-sm font-semibold text-blue-600">
               {Math.round(category.rating)}
-              <span className="text-xs text-gray-500 ml-1">
-                ±{Math.round(category.ratingDeviation || 350)}
-              </span>
             </div>
           )}
         </div>
