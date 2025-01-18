@@ -13,10 +13,12 @@ interface CustomSquareStyles {
   [square: string]: { backgroundColor: string };
 }
 
+const HIGHLIGHT_COLOR = { backgroundColor: 'rgba(134, 239, 172, 0.4)' }; // Light green with transparency
+
 export default function Chessboard({ size = 600 }: ChessboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [game, setGame] = useState(new Chess());
-  const [boardOrientation] = useState<'white' | 'black'>('white');
+  const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
   const [highlightedSquares, setHighlightedSquares] = useState<CustomSquareStyles>({});
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(150);
@@ -27,7 +29,64 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Update game when puzzle changes and show opponent's first move
+  useEffect(() => {
+    async function setupPuzzle() {
+      try {
+        if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
+          // Disable animations initially
+          setTransitionDuration(0);
+          setIsAnimating(false);
+          
+          // Reset the game with the puzzle position
+          const newGame = new Chess();
+          newGame.load(currentPuzzle.fen);
+          setGame(newGame);
+          setCurrentMoveIndex(1);
+          setPuzzleSolved(false);
+          setPuzzleFailed(false);
+          setHighlightedSquares({});
+          
+          // Set board orientation based on who moves first
+          setBoardOrientation(currentPuzzle.fen.split(' ')[1] === 'w' ? 'black' : 'white');
+          
+          // Make the first move (opponent's move)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          const firstMove = currentPuzzle.moves[0];
+          newGame.move(firstMove);
+          
+          // Highlight the move
+          setHighlightedSquares({
+            [firstMove.slice(0, 2)]: HIGHLIGHT_COLOR,
+            [firstMove.slice(2, 4)]: HIGHLIGHT_COLOR
+          });
+          
+          // Re-enable animations
+          setTransitionDuration(150);
+          setGame(newGame);
+        }
+      } catch (error) {
+        console.error('Error setting up puzzle:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    setupPuzzle();
+  }, [currentPuzzle]);
+
+  // Don't show anything until we have loaded the initial state
+  if (isLoading && !currentPuzzle) {
+    return (
+      <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-gray-500">Loading puzzle...</div>
+      </div>
+    );
+  }
+
   const onDrop = (sourceSquare: string, targetSquare: string) => {
+    if (!currentPuzzle || isAnimating) return false;
+
     try {
       const move = game.move({
         from: sourceSquare,
@@ -37,9 +96,16 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
 
       if (move === null) return false;
 
+      // Highlight the move
+      setHighlightedSquares({
+        [sourceSquare]: HIGHLIGHT_COLOR,
+        [targetSquare]: HIGHLIGHT_COLOR
+      });
+
       if (currentPuzzle && currentMoveIndex < currentPuzzle.moves.length) {
         const expectedMove = currentPuzzle.moves[currentMoveIndex];
-        if (move.san === expectedMove) {
+        const moveString = `${sourceSquare}${targetSquare}`;
+        if (moveString === expectedMove) {
           // Correct move
           setCurrentMoveIndex(currentMoveIndex + 1);
           if (currentMoveIndex + 1 >= currentPuzzle.moves.length) {
@@ -47,6 +113,28 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
             setPuzzleSolved(true);
             setPuzzleFailed(false);
             dispatch(updateRatingsAfterPuzzle({ success: true, userId: user?.id }));
+          } else {
+            // Make opponent's next move
+            setIsAnimating(true);
+            setTimeout(() => {
+              const opponentMove = currentPuzzle.moves[currentMoveIndex + 1];
+              const [fromSquare, toSquare] = [opponentMove.slice(0, 2), opponentMove.slice(2, 4)];
+              game.move({
+                from: fromSquare,
+                to: toSquare,
+                promotion: opponentMove[4] || 'q'
+              });
+              
+              // Highlight opponent's move
+              setHighlightedSquares({
+                [fromSquare]: HIGHLIGHT_COLOR,
+                [toSquare]: HIGHLIGHT_COLOR
+              });
+
+              setCurrentMoveIndex(currentMoveIndex + 2);
+              setIsAnimating(false);
+              setGame(new Chess(game.fen()));
+            }, 500);
           }
         } else {
           // Incorrect move
