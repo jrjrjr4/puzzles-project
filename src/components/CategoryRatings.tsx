@@ -43,28 +43,6 @@ export default function CategoryRatings() {
 
   return (
     <div className="bg-white p-2 h-full w-full max-w-full">
-      <div className="flex justify-center mb-3">
-        {lastRatingUpdates ? (
-          <div className="flex items-center gap-2">
-            <div className="text-xl font-bold text-indigo-600">
-              {Math.round(lastRatingUpdates.overall.oldRating)}
-            </div>
-            <div className="text-sm">→</div>
-            <div className={`text-xl font-bold ${
-              lastRatingUpdates.overall.newRating > lastRatingUpdates.overall.oldRating 
-                ? 'text-green-600' 
-                : 'text-red-600'
-            }`}>
-              {Math.round(lastRatingUpdates.overall.newRating)}
-            </div>
-          </div>
-        ) : (
-          <div className="text-xl font-bold text-indigo-600">
-            {Math.round(userRatings.overall.rating)}
-          </div>
-        )}
-      </div>
-
       <div className="grid grid-cols-2 gap-1">
         <div>
           <h3 className="text-xs font-medium text-green-600 mb-1">Strengths</h3>
