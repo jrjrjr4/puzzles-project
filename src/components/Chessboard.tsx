@@ -7,6 +7,7 @@ import { updateRatingsAfterPuzzle } from '../store/slices/puzzleSlice';
 
 interface ChessboardProps {
   size?: number;
+  onPuzzleComplete?: (solved: boolean) => void;
 }
 
 interface CustomSquareStyles {
@@ -15,7 +16,7 @@ interface CustomSquareStyles {
 
 const HIGHLIGHT_COLOR = { backgroundColor: 'rgba(134, 239, 172, 0.4)' }; // Light green with transparency
 
-export default function Chessboard({ size = 600 }: ChessboardProps) {
+export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
@@ -113,6 +114,7 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
             setPuzzleSolved(true);
             setPuzzleFailed(false);
             dispatch(updateRatingsAfterPuzzle({ success: true, userId: user?.id }));
+            onPuzzleComplete?.(true);
           } else {
             // Make opponent's next move
             setIsAnimating(true);
@@ -141,6 +143,7 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
           setPuzzleSolved(false);
           setPuzzleFailed(true);
           dispatch(updateRatingsAfterPuzzle({ success: false, userId: user?.id }));
+          onPuzzleComplete?.(false);
         }
       }
 
@@ -157,13 +160,17 @@ export default function Chessboard({ size = 600 }: ChessboardProps) {
     return (
       <div className="text-center">
         {puzzleSolved && (
-          <div className="bg-green-100 text-green-800 p-4 rounded-lg mb-4">
-            Puzzle Solved!
+          <div className="space-y-4">
+            <div className="bg-green-100 text-green-800 p-4 rounded-lg">
+              Puzzle Solved!
+            </div>
           </div>
         )}
         {puzzleFailed && (
-          <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-4">
-            Try again!
+          <div className="space-y-4">
+            <div className="bg-red-100 text-red-800 p-4 rounded-lg">
+              Try again!
+            </div>
           </div>
         )}
       </div>

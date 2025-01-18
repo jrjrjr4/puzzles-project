@@ -16,12 +16,14 @@ export default function GameSection() {
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
   const user = useSelector((state: RootState) => state.auth.user);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
-  const [rightPanelWidth, setRightPanelWidth] = useState(520);
+  const [rightPanelWidth] = useState(520);
   const [boardSize, setBoardSize] = useState(0);
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startSize = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [puzzleSolved, setPuzzleSolved] = useState(false);
+  const [puzzleFailed, setPuzzleFailed] = useState(false);
 
   // Load the last puzzle on mount
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function GameSection() {
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging.current) return;
     const deltaY = e.clientY - startY.current;
-    const newSize = Math.max(300, Math.min(800, startSize.current - deltaY));
+    const newSize = Math.max(300, Math.min(800, startSize.current + deltaY));
     setBoardSize(newSize);
   };
 
@@ -78,6 +80,8 @@ export default function GameSection() {
     try {
       setIsLoading(true);
       setError(null);
+      setPuzzleSolved(false);
+      setPuzzleFailed(false);
       
       const response = await fetch('/filtered_puzzles.csv');
       if (!response.ok) {
@@ -107,26 +111,17 @@ export default function GameSection() {
     }
   };
 
+  const handlePuzzleComplete = (solved: boolean) => {
+    setPuzzleSolved(solved);
+    setPuzzleFailed(!solved);
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen pb-4 md:pb-8">
       <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
-        <div className="w-full mb-2 md:mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
-          <button
-            onClick={loadNextPuzzle}
-            disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Loading...' : 'Load Next Puzzle'}
-          </button>
-          {error && (
-            <div className="mt-2 p-2 text-sm text-red-600 bg-red-100 rounded">
-              {error}
-            </div>
-          )}
-        </div>
         <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
           <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
-            {boardSize > 0 && <Chessboard size={boardSize} />}
+            {boardSize > 0 && <Chessboard size={boardSize} onPuzzleComplete={handlePuzzleComplete} />}
             <div
               className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group hidden md:block"
               onMouseDown={handleMouseDown}
@@ -135,6 +130,24 @@ export default function GameSection() {
             </div>
           </div>
         </div>
+        {error && (
+          <div className="w-full text-center mt-4">
+            <div className="inline-block p-2 text-sm text-red-600 bg-red-100 rounded">
+              {error}
+            </div>
+          </div>
+        )}
+        {(puzzleSolved || puzzleFailed) && (
+          <div className="w-full text-center mt-4">
+            <button
+              onClick={loadNextPuzzle}
+              disabled={isLoading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg font-medium shadow-md hover:shadow-lg transition-all"
+            >
+              {isLoading ? 'Loading...' : 'Next Puzzle'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-2 md:mt-0 md:ml-4 md:w-[520px] md:flex-shrink-0">
