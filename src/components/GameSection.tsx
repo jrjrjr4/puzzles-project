@@ -27,10 +27,19 @@ export default function GameSection() {
 
   // Load the last puzzle on mount
   useEffect(() => {
-    if (user?.id) {
-      dispatch(fetchLastPuzzle(user.id));
+    async function initializePuzzle() {
+      if (user?.id) {
+        await dispatch(fetchLastPuzzle(user.id));
+      }
+      
+      // If we don't have a current puzzle (either no user or no last puzzle), load a new one
+      if (!currentPuzzle) {
+        loadNextPuzzle();
+      }
     }
-  }, [dispatch, user?.id]);
+
+    initializePuzzle();
+  }, [dispatch, user?.id, currentPuzzle]);
 
   // Save puzzle when it changes
   useEffect(() => {
