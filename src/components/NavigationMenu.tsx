@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Sword, Target, Crown, Book, Settings, LogOut } from 'lucide-react';
+import { ChevronDown, Settings, LogOut } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { supabase } from '../utils/supabase';
 import { setUser } from '../store/slices/authSlice';
@@ -8,66 +8,6 @@ import { setUser } from '../store/slices/authSlice';
 const TABS = [
   {
     id: 1,
-    title: 'Training',
-    Component: () => (
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <h3 className="mb-2 text-sm font-medium">Puzzles</h3>
-          <a href="#" className="mb-1 block text-sm text-gray-500 hover:text-blue-600">
-            Random Puzzle
-          </a>
-          <a href="#" className="block text-sm text-gray-500 hover:text-blue-600">
-            Daily Challenge
-          </a>
-        </div>
-        <div>
-          <h3 className="mb-2 text-sm font-medium">Categories</h3>
-          <a href="#" className="mb-1 block text-sm text-gray-500 hover:text-blue-600">
-            Tactics
-          </a>
-          <a href="#" className="mb-1 block text-sm text-gray-500 hover:text-blue-600">
-            Endgames
-          </a>
-          <a href="#" className="block text-sm text-gray-500 hover:text-blue-600">
-            Strategy
-          </a>
-        </div>
-        <div>
-          <h3 className="mb-2 text-sm font-medium">Progress</h3>
-          <a href="#" className="mb-1 block text-sm text-gray-500 hover:text-blue-600">
-            Statistics
-          </a>
-          <a href="#" className="block text-sm text-gray-500 hover:text-blue-600">
-            History
-          </a>
-        </div>
-      </div>
-    ),
-    icon: Sword
-  },
-  {
-    id: 2,
-    title: 'Learn',
-    Component: () => (
-      <div className="grid grid-cols-3 gap-4 divide-x divide-gray-200">
-        <a href="#" className="flex w-full flex-col items-center justify-center py-2 text-gray-500 transition-colors hover:text-blue-600">
-          <Target className="mb-2 text-xl text-blue-600" />
-          <span className="text-xs">Tactics</span>
-        </a>
-        <a href="#" className="flex w-full flex-col items-center justify-center py-2 text-gray-500 transition-colors hover:text-blue-600">
-          <Crown className="mb-2 text-xl text-blue-600" />
-          <span className="text-xs">Endgame</span>
-        </a>
-        <a href="#" className="flex w-full flex-col items-center justify-center py-2 text-gray-500 transition-colors hover:text-blue-600">
-          <Book className="mb-2 text-xl text-blue-600" />
-          <span className="text-xs">Strategy</span>
-        </a>
-      </div>
-    ),
-    icon: Book
-  },
-  {
-    id: 3,
     title: 'Settings',
     Component: () => {
       const dispatch = useDispatch();
@@ -136,7 +76,7 @@ const Content = ({ selected, dir }) => {
         opacity: 0,
         y: 8,
       }}
-      className="absolute left-0 top-[calc(100%_+_24px)] w-[400px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+      className="absolute left-0 top-[calc(100%_+_24px)] w-[400px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg z-50"
     >
       <Bridge />
       <Nub selected={selected} />
