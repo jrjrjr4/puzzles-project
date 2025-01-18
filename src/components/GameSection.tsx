@@ -108,7 +108,7 @@ export default function GameSection() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen pb-4 md:pb-8">
+    <div className="flex flex-col md:flex-row min-h-screen pb-4 md:pb-8">
       <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
         <div className="w-full mb-2 md:mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
           <button
@@ -137,7 +137,7 @@ export default function GameSection() {
         </div>
       </div>
 
-      <div className="mt-2 md:mt-4">
+      <div className="mt-2 md:mt-0 md:ml-4 md:w-[520px] md:flex-shrink-0">
         <div 
           className="w-full overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
         >
