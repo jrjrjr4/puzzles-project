@@ -53,40 +53,40 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
 
   if (!userRatings.loaded || !userRatings.overall) {
     return (
-      <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center space-x-3 mb-2">
+      <div className="p-2 md:p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center space-x-2 md:space-x-3 mb-1 md:mb-2">
           <div className="flex-shrink-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Icon className="w-5 h-5 text-blue-600" />
+            <div className="w-6 h-6 md:w-10 md:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Icon className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
             </div>
           </div>
-          <h4 className="text-sm sm:text-base font-medium text-gray-900">{category.name}</h4>
+          <h4 className="text-xs md:text-base font-medium text-gray-900">{category.name}</h4>
         </div>
         <div className="text-center">
-          <div className="text-sm text-gray-500">Loading...</div>
+          <div className="text-xs md:text-sm text-gray-500">Loading...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center space-x-3 mb-2">
+    <div className="p-2 md:p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center space-x-2 md:space-x-3 mb-1 md:mb-2">
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <Icon className="w-5 h-5 text-blue-600" />
+          <div className="w-6 h-6 md:w-10 md:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <Icon className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
           </div>
         </div>
-        <h4 className="text-sm sm:text-base font-medium text-gray-900">{category.name}</h4>
+        <h4 className="text-xs md:text-base font-medium text-gray-900">{category.name}</h4>
       </div>
       <div className="text-center">
         {ratingUpdate ? (
-          <div className="flex items-center justify-center gap-2">
-            <div className="text-base sm:text-lg font-semibold text-blue-600">
+          <div className="flex items-center justify-center gap-1 md:gap-2">
+            <div className="text-sm md:text-lg font-semibold text-blue-600">
               {Math.round(ratingUpdate.oldRating)}
             </div>
-            <div className="text-sm">→</div>
-            <div className={`text-base sm:text-lg font-semibold ${
+            <div className="text-xs md:text-sm">→</div>
+            <div className={`text-sm md:text-lg font-semibold ${
               ratingUpdate.newRating > ratingUpdate.oldRating 
                 ? 'text-green-600' 
                 : 'text-red-600'
@@ -95,11 +95,11 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
             </div>
           </div>
         ) : (
-          <div className="text-base sm:text-lg font-semibold text-blue-600">
+          <div className="text-sm md:text-lg font-semibold text-blue-600">
             {Math.round(category.rating)}
           </div>
         )}
-        <div className="text-xs text-gray-500">
+        <div className="text-[10px] md:text-xs text-gray-500">
           ±{Math.round(category.ratingDeviation || 350)}
         </div>
       </div>

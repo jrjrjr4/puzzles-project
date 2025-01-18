@@ -42,19 +42,19 @@ export default function CategoryRatings() {
   const weakestCategories = sortedCategories.slice(-5).reverse();
 
   return (
-    <div className="bg-white p-4 sm:p-6 h-full w-full max-w-full">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2 sm:mb-0">Categories</h2>
+    <div className="bg-white p-2 md:p-6 h-full w-full max-w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 md:mb-6">
+        <h2 className="text-base md:text-xl font-semibold text-gray-800 mb-1 sm:mb-0">Categories</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Overall Rating</span>
+          <span className="text-xs md:text-sm text-gray-500">Overall Rating</span>
           <div className="text-right">
             {lastRatingUpdates ? (
-              <div className="flex items-center gap-2">
-                <div className="text-base sm:text-lg font-bold text-blue-600">
+              <div className="flex items-center gap-1 md:gap-2">
+                <div className="text-sm md:text-lg font-bold text-blue-600">
                   {Math.round(lastRatingUpdates.overall.oldRating)}
                 </div>
-                <div className="text-sm">→</div>
-                <div className={`text-base sm:text-lg font-bold ${
+                <div className="text-xs md:text-sm">→</div>
+                <div className={`text-sm md:text-lg font-bold ${
                   lastRatingUpdates.overall.newRating > lastRatingUpdates.overall.oldRating 
                     ? 'text-green-600' 
                     : 'text-red-600'
@@ -63,21 +63,21 @@ export default function CategoryRatings() {
                 </div>
               </div>
             ) : (
-              <div className="text-base sm:text-lg font-bold text-blue-600">
+              <div className="text-sm md:text-lg font-bold text-blue-600">
                 {Math.round(userRatings.overall.rating)}
               </div>
             )}
-            <div className="text-xs text-gray-500">
+            <div className="text-[10px] md:text-xs text-gray-500">
               ±{Math.round(userRatings.overall.ratingDeviation)}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-2 md:gap-6">
         <div>
-          <h3 className="text-sm font-medium text-green-600 mb-4">Strengths</h3>
-          <div className="space-y-3">
+          <h3 className="text-xs md:text-sm font-medium text-green-600 mb-2 md:mb-4">Strengths</h3>
+          <div className="space-y-2 md:space-y-3">
             {strongestCategories.map((category) => (
               <CategoryCard
                 key={category.name}
@@ -92,9 +92,9 @@ export default function CategoryRatings() {
           </div>
         </div>
 
-        <div className="md:border-l md:pl-6">
-          <h3 className="text-sm font-medium text-orange-600 mb-4">Focus Areas</h3>
-          <div className="space-y-3">
+        <div className="border-l pl-2 md:pl-6">
+          <h3 className="text-xs md:text-sm font-medium text-orange-600 mb-2 md:mb-4">Focus Areas</h3>
+          <div className="space-y-2 md:space-y-3">
             {weakestCategories.map((category) => (
               <CategoryCard
                 key={category.name}

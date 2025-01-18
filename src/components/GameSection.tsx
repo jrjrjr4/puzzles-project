@@ -108,9 +108,9 @@ export default function GameSection() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen pb-8">
+    <div className="flex flex-col min-h-screen pb-4 md:pb-8">
       <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
-        <div className="w-full mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
+        <div className="w-full mb-2 md:mb-4 flex justify-center sticky top-0 bg-gray-50 z-10 py-2">
           <button
             onClick={loadNextPuzzle}
             disabled={isLoading}
@@ -124,10 +124,9 @@ export default function GameSection() {
             </div>
           )}
         </div>
-        <div ref={containerRef} className="w-full flex items-center justify-center relative px-4">
+        <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
           <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
             {boardSize > 0 && <Chessboard size={boardSize} />}
-            {/* Hide resize handle on mobile */}
             <div
               className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group hidden md:block"
               onMouseDown={handleMouseDown}
@@ -138,15 +137,14 @@ export default function GameSection() {
         </div>
       </div>
 
-      <div className="flex lg:h-fit mt-4 lg:mt-0">
+      <div className="mt-2 md:mt-4">
         <div 
-          className="w-full lg:w-auto lg:flex-shrink-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
-          style={{ width: `${rightPanelWidth}px` }}
+          className="w-full overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
         >
           <div className="sticky top-0 bg-gray-50 z-10">
             <PuzzleInfo />
           </div>
-          <div className="pb-8">
+          <div className="pb-4 md:pb-8">
             <CategoryRatings />
           </div>
         </div>
