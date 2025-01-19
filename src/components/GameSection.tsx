@@ -128,6 +128,17 @@ export default function GameSection() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen pb-4 md:pb-8">
       <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
+        {(puzzleSolved || puzzleFailed) && (
+          <div className="absolute top-4 left-4 z-10">
+            <button
+              onClick={loadNextPuzzle}
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base font-medium shadow-md hover:shadow-lg transition-all"
+            >
+              {isLoading ? 'Loading...' : 'Next Puzzle'}
+            </button>
+          </div>
+        )}
         <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
           <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
             {boardSize > 0 && <Chessboard size={boardSize} onPuzzleComplete={handlePuzzleComplete} />}
@@ -144,17 +155,6 @@ export default function GameSection() {
             <div className="inline-block p-2 text-sm text-red-600 bg-red-100 rounded">
               {error}
             </div>
-          </div>
-        )}
-        {(puzzleSolved || puzzleFailed) && (
-          <div className="w-full text-center mt-4">
-            <button
-              onClick={loadNextPuzzle}
-              disabled={isLoading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg font-medium shadow-md hover:shadow-lg transition-all"
-            >
-              {isLoading ? 'Loading...' : 'Next Puzzle'}
-            </button>
           </div>
         )}
       </div>
