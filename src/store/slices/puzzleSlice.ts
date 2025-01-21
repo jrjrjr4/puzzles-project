@@ -410,16 +410,38 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
       // Save to guest-specific localStorage
       localStorage.setItem(`guest_last_puzzle_${userId}`, JSON.stringify(puzzle));
       console.log('💾 Saved last puzzle to guest localStorage');
+      return;
     }
 
-    // Save to Supabase
-    const { error } = await supabase
+    // First check if record exists
+    const { data: existingRecord } = await supabase
       .from('user_progress')
-      .upsert({
-        user_id: userId,
-        last_puzzle: puzzle,
-        updated_at: new Date().toISOString()
-      });
+      .select('user_id')
+      .eq('user_id', userId)
+      .single();
+
+    let error;
+    if (existingRecord) {
+      // Update existing record
+      const { error: updateError } = await supabase
+        .from('user_progress')
+        .update({
+          last_puzzle: puzzle,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+      error = updateError;
+    } else {
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from('user_progress')
+        .insert({
+          user_id: userId,
+          last_puzzle: puzzle,
+          updated_at: new Date().toISOString()
+        });
+      error = insertError;
+    }
 
     if (error) {
       console.error('❌ Error saving current puzzle:', error);

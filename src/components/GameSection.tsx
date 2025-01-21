@@ -28,23 +28,35 @@ export default function GameSection() {
   // Load the last puzzle on mount
   useEffect(() => {
     async function initializePuzzle() {
-      if (user?.id) {
+      if (user?.id && !currentPuzzle) {  // Only fetch if we don't have a puzzle
         await dispatch(fetchLastPuzzle(user.id));
       }
       
-      // If we don't have a current puzzle (either no user or no last puzzle), load a new one
+      // If we still don't have a current puzzle after fetching, load a new one
       if (!currentPuzzle) {
         loadNextPuzzle();
       }
     }
 
     initializePuzzle();
-  }, [dispatch, user?.id, currentPuzzle]);
+  }, [dispatch, user?.id]); // Remove currentPuzzle from dependencies
 
   // Save puzzle when it changes
   useEffect(() => {
+    let shouldSave = false;
     if (user?.id && currentPuzzle) {
-      dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
+      // Add a small delay to batch potential rapid updates
+      const timeoutId = setTimeout(() => {
+        if (shouldSave) {
+          dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
+        }
+      }, 100);
+      
+      shouldSave = true;
+      return () => {
+        clearTimeout(timeoutId);
+        shouldSave = false;
+      };
     }
   }, [dispatch, user?.id, currentPuzzle]);
 

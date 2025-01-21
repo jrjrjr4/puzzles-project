@@ -1,0 +1,5 @@
+[33maf3ff7f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m fixed but where multiple different puzzles were loading in a row
+[33meb7c39f[m fixed bug where pupzzles weren't loading for guest
+[33m723a151[m fixed bugs where puzzles weren't loading or multiple puzzles were loading in succession
+[33m2f16b05[m moved next puzzle button to top left corner
+[33med9e300[m fixed ui issues
