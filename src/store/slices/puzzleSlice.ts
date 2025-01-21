@@ -53,27 +53,42 @@ const puzzleSlice = createSlice({
   initialState,
   reducers: {
     setCurrentPuzzle: (state, action) => {
-      console.log('Setting current puzzle:', action.payload);
+      console.group('🧩 [PuzzleSlice] Setting Current Puzzle');
+      console.time('puzzleStateUpdate');
       
       if (!action.payload) {
-        console.warn('Attempted to set null puzzle');
+        console.warn('⚠️ Attempted to set null puzzle');
         state.currentPuzzle = null;
+        console.timeEnd('puzzleStateUpdate');
+        console.groupEnd();
         return;
       }
       
       try {
+        const oldPuzzleId = state.currentPuzzle?.id;
         state.currentPuzzle = {
           ...action.payload,
           themes: action.payload.themes || ['Tactics'],
           rating: Number(action.payload.rating) || 1200,
           ratingDeviation: Number(action.payload.ratingDeviation) || BASE_RD,
         };
-        console.log('Current puzzle set to:', state.currentPuzzle);
+        
+        if (state.currentPuzzle) {
+          console.log('State transition:', {
+            from: oldPuzzleId,
+            to: state.currentPuzzle.id,
+            themes: state.currentPuzzle.themes,
+            rating: state.currentPuzzle.rating
+          });
+        }
+        
         state.lastRatingUpdates = null;
+        console.timeEnd('puzzleStateUpdate');
       } catch (error) {
-        console.error('Error setting current puzzle:', error);
+        console.error('❌ Error setting current puzzle:', error);
         state.currentPuzzle = null;
       }
+      console.groupEnd();
     },
     loadLastPuzzle: (state) => {
       // This is now just a placeholder - actual loading happens in the thunk

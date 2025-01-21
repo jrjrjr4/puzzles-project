@@ -14,6 +14,7 @@ export default function GameSection() {
   const [error, setError] = useState<string | null>(null);
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   const user = useSelector((state: RootState) => state.auth.user);
   const isAuthLoading = useSelector((state: RootState) => state.auth.loading);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
@@ -31,6 +32,43 @@ export default function GameSection() {
   const [cachedPuzzles, setCachedPuzzles] = useState<ReturnType<typeof parsePuzzleCsv>>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const loadingTimeoutRef = useRef<NodeJS.Timeout>();
+  const [precomputedNextPuzzle, setPrecomputedNextPuzzle] = useState<ReturnType<typeof parsePuzzleCsv>[0] | null>(null);
+  const [previousPuzzle, setPreviousPuzzle] = useState<ReturnType<typeof parsePuzzleCsv>[0] | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Add performance measurement
+  const transitionStartTime = useRef<number | null>(null);
+
+  // Effect to log state changes
+  useEffect(() => {
+    console.group('🔄 [GameSection] State Update');
+    console.log('Current Puzzle:', currentPuzzle?.id);
+    console.log('Is Loading:', isLoading);
+    console.log('Is Transitioning:', isTransitioning);
+    console.log('Precomputed Next:', precomputedNextPuzzle?.id);
+    console.log('Previous Puzzle:', previousPuzzle?.id);
+    if (transitionStartTime.current) {
+      console.log('Transition Time:', Date.now() - transitionStartTime.current, 'ms');
+    }
+    console.groupEnd();
+  }, [currentPuzzle, isLoading, isTransitioning, precomputedNextPuzzle, previousPuzzle]);
+
+  // Effect to precompute next puzzle when ratings are updated
+  useEffect(() => {
+    if (lastRatingUpdates && cachedPuzzles.length > 0) {
+      console.log('🎯 [Precompute] Computing next puzzle after ratings update');
+      const themeRatings: { [theme: string]: number } = {};
+      Object.entries(userRatings.categories).forEach(([theme, data]) => {
+        themeRatings[theme] = data.rating;
+      });
+      
+      const nextPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
+      if (nextPuzzle) {
+        console.log('✨ [Precompute] Next puzzle ready:', nextPuzzle.id);
+        setPrecomputedNextPuzzle(nextPuzzle);
+      }
+    }
+  }, [lastRatingUpdates, cachedPuzzles, userRatings.categories, usedPuzzleIds]);
 
   // Load the last puzzle on mount or when user changes
   useEffect(() => {
@@ -216,70 +254,84 @@ export default function GameSection() {
   }, []);
 
   const loadNextPuzzle = async () => {
-    // Debug log for next puzzle button click
-    console.log('🎯 [Next Puzzle] Button clicked');
+    console.group('🎯 [Next Puzzle] Transition Start');
+    transitionStartTime.current = Date.now();
     
-    // Prevent multiple simultaneous puzzle loads
     if (isLoadingPuzzle.current) {
-      console.log('⚠️ [Next Puzzle] Blocked - Already loading puzzle');
+      console.warn('⚠️ [Next Puzzle] Blocked - Already loading puzzle');
+      console.groupEnd();
       return;
     }
-    
-    // Clear any existing loading timeout
-    if (loadingTimeoutRef.current) {
-      console.log('🧹 [Next Puzzle] Clearing existing loading timeout');
-      clearTimeout(loadingTimeoutRef.current);
-    }
-    
-    try {
-      console.log('🔄 [Next Puzzle] Starting puzzle load');
-      isLoadingPuzzle.current = true;
-      setIsLoading(true);
-      setError(null);
-      
-      if (cachedPuzzles.length === 0) {
-        throw new Error('No puzzles available');
-      }
-      
-      const themeRatings: { [theme: string]: number } = {};
-      Object.entries(userRatings.categories).forEach(([theme, data]) => {
-        themeRatings[theme] = data.rating;
-      });
-      
-      const selectedPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
 
-      if (selectedPuzzle) {
-        usedPuzzleIds.add(selectedPuzzle.id);
-        console.log(`✅ [Next Puzzle] Selected puzzle: ${selectedPuzzle.id}`);
-        
-        // Set a loading timeout to ensure state updates are synchronized
-        await new Promise<void>((resolve) => {
-          loadingTimeoutRef.current = setTimeout(() => {
-            if (isLoadingPuzzle.current) {
-              console.log(`🎮 [Next Puzzle] Setting current puzzle: ${selectedPuzzle.id}`);
-              dispatch(setCurrentPuzzle(selectedPuzzle));
-              setPuzzleSolved(false);
-              setPuzzleFailed(false);
-              resolve();
-            } else {
-              console.log('⚠️ [Next Puzzle] Cancelled - Loading state cleared');
-              resolve();
-            }
-          }, 500); // Increased delay to ensure proper state synchronization
+    try {
+      isLoadingPuzzle.current = true;
+      setIsTransitioning(true);
+      console.log('📊 [Next Puzzle] Current State:', {
+        currentPuzzleId: currentPuzzle?.id,
+        precomputedId: precomputedNextPuzzle?.id,
+        isLoading,
+        cachedPuzzlesCount: cachedPuzzles.length
+      });
+
+      // Store previous puzzle before transition
+      if (currentPuzzle) {
+        setPreviousPuzzle({
+          ...currentPuzzle,
+          popularity: 0,  // Default value since we don't track this
+          nbPlays: 0,    // Default value since we don't track this
+          gameUrl: '',   // Default value since we don't track this
+          openingTags: [], // Default value since we don't track this
         });
-      } else {
-        setError('No suitable puzzle found');
       }
-    } catch (error) {
-      console.error('Failed to load puzzle:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load puzzle');
-    } finally {
-      // Add a small delay before clearing loading states to prevent flashing
+
+      // Use precomputed puzzle if available
+      if (precomputedNextPuzzle) {
+        console.log('✨ [Next Puzzle] Using precomputed puzzle:', precomputedNextPuzzle.id);
+        dispatch(setCurrentPuzzle(precomputedNextPuzzle));
+        setPrecomputedNextPuzzle(null);
+      } else {
+        console.log('🔄 [Next Puzzle] Computing new puzzle');
+        const themeRatings: { [theme: string]: number } = {};
+        Object.entries(userRatings.categories).forEach(([theme, data]) => {
+          themeRatings[theme] = data.rating;
+        });
+        
+        const nextPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
+        if (nextPuzzle) {
+          console.log('✨ [Next Puzzle] Selected new puzzle:', nextPuzzle.id);
+          dispatch(setCurrentPuzzle(nextPuzzle));
+        } else {
+          console.error('❌ [Next Puzzle] Failed to get next puzzle');
+          setError('Failed to load next puzzle');
+        }
+      }
+
+      // Start precomputing next puzzle
       setTimeout(() => {
-        console.log('✨ [Next Puzzle] Cleaning up loading states');
-        setIsLoading(false);
-        isLoadingPuzzle.current = false;
+        if (cachedPuzzles.length > 0) {
+          console.log('🎯 [Precompute] Starting next puzzle computation');
+          const themeRatings: { [theme: string]: number } = {};
+          Object.entries(userRatings.categories).forEach(([theme, data]) => {
+            themeRatings[theme] = data.rating;
+          });
+          
+          const nextPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
+          if (nextPuzzle) {
+            console.log('✨ [Precompute] Next puzzle ready:', nextPuzzle.id);
+            setPrecomputedNextPuzzle(nextPuzzle);
+          }
+        }
       }, 100);
+
+    } catch (error) {
+      console.error('❌ [Next Puzzle] Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load next puzzle');
+    } finally {
+      isLoadingPuzzle.current = false;
+      setIsTransitioning(false);
+      const transitionTime = Date.now() - (transitionStartTime.current || Date.now());
+      console.log('✨ [Next Puzzle] Transition complete in', transitionTime, 'ms');
+      console.groupEnd();
     }
   };
 
@@ -321,7 +373,6 @@ export default function GameSection() {
             )}
             <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
               <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
-                {/* Always show board when we have a puzzle */}
                 {boardSize > 0 && currentPuzzle && (
                   <Chessboard size={boardSize} onPuzzleComplete={handlePuzzleComplete} />
                 )}
