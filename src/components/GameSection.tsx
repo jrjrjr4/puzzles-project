@@ -24,40 +24,51 @@ export default function GameSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [puzzleSolved, setPuzzleSolved] = useState(false);
   const [puzzleFailed, setPuzzleFailed] = useState(false);
+  const isInitializing = useRef(false);
+  const isLoadingPuzzle = useRef(false);
 
   // Load the last puzzle on mount
   useEffect(() => {
+    let mounted = true;
+
     async function initializePuzzle() {
-      if (user?.id && !currentPuzzle) {  // Only fetch if we don't have a puzzle
-        await dispatch(fetchLastPuzzle(user.id));
-      }
+      if (isInitializing.current || !mounted) return;
       
-      // If we still don't have a current puzzle after fetching, load a new one
-      if (!currentPuzzle) {
-        loadNextPuzzle();
+      try {
+        isInitializing.current = true;
+        
+        if (user?.id && !currentPuzzle) {
+          await dispatch(fetchLastPuzzle(user.id));
+          if (!mounted) return;
+          
+          // Check if we have a puzzle after fetching
+          if (!currentPuzzle && mounted) {
+            await loadNextPuzzle();
+          }
+        } else if (!currentPuzzle && mounted) {
+          await loadNextPuzzle();
+        }
+      } finally {
+        isInitializing.current = false;
       }
     }
 
     initializePuzzle();
-  }, [dispatch, user?.id]); // Remove currentPuzzle from dependencies
+
+    return () => {
+      mounted = false;
+    };
+  }, [dispatch, user?.id]);
 
   // Save puzzle when it changes
   useEffect(() => {
-    let shouldSave = false;
-    if (user?.id && currentPuzzle) {
-      // Add a small delay to batch potential rapid updates
-      const timeoutId = setTimeout(() => {
-        if (shouldSave) {
-          dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
-        }
-      }, 100);
-      
-      shouldSave = true;
-      return () => {
-        clearTimeout(timeoutId);
-        shouldSave = false;
-      };
-    }
+    const timeoutId = setTimeout(() => {
+      if (user?.id && currentPuzzle) {
+        dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [dispatch, user?.id, currentPuzzle]);
 
   // Calculate initial board size and update on window resize
@@ -98,7 +109,10 @@ export default function GameSection() {
   };
 
   const loadNextPuzzle = async () => {
+    if (isLoadingPuzzle.current) return;
+    
     try {
+      isLoadingPuzzle.current = true;
       setIsLoading(true);
       setError(null);
       setPuzzleSolved(false);
@@ -129,6 +143,7 @@ export default function GameSection() {
       setError(error instanceof Error ? error.message : 'Failed to load puzzle');
     } finally {
       setIsLoading(false);
+      isLoadingPuzzle.current = false;
     }
   };
 
