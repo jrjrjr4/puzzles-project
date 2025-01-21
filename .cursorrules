@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cursor_rules>
+  <project_context>
+    This is a React/TypeScript puzzle project using modern web technologies including Tailwind CSS.
+  </project_context>
+
+  <coding_rules>
+    <!-- Framework-specific rules -->
+    <rule>Use TypeScript strict mode and proper type definitions for all components and functions</rule>
+    <rule>Follow React best practices and hooks guidelines</rule>
+    <rule>Utilize Tailwind CSS for styling, maintaining consistent class naming</rule>
+    
+    <!-- Code preservation rules -->
+    <rule>Never delete existing code unless explicitly requested or absolutely necessary for bug fixes</rule>
+    <rule>Preserve all type definitions and interfaces</rule>
+    <rule>Maintain existing component structure unless refactoring is requested</rule>
+    
+    <!-- State management -->
+    <rule>Use Redux store slices appropriately for global state management</rule>
+    <rule>Implement proper error handling and loading states</rule>
+    
+    <!-- Documentation -->
+    <rule>Add JSDoc comments for all new functions and components</rule>
+    <rule>Keep inline comments concise and meaningful</rule>
+    <rule>Document all major changes in CHANGELOG.md</rule>
+  </coding_rules>
+
+  <style_guide>
+    <rule>Use consistent 2-space indentation</rule>
+    <rule>Follow TypeScript naming conventions (PascalCase for components, camelCase for functions)</rule>
+    <rule>Group imports logically: React, third-party, local components, styles</rule>
+  </style_guide>
+</cursor_rules> 
