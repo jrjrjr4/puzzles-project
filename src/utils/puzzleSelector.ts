@@ -15,7 +15,17 @@ interface UserThemeRatings {
 }
 
 function log(message: string, data?: any) {
-    console.log(`[PuzzleSelector] ${message}`, data ? data : '');
+    // Only log final selection and important debug info
+    if (message.includes('=== Final Selection ===') || 
+        message.includes('Starting puzzle selection') ||
+        message.includes('No puzzles available') ||
+        message.includes('WARNING:')) {
+        console.log(`[PuzzleSelector] ${message}`, data ? data : '');
+    }
+    // Comment out detailed selection logs for now
+    // else {
+    //   console.log(`[PuzzleSelector] ${message}`, data ? data : '');
+    // }
 }
 
 function computeThemeProbabilities(userThemeRatings: UserThemeRatings): { [theme: string]: number } {

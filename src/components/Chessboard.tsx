@@ -37,7 +37,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
         if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
           // Disable animations initially
           setTransitionDuration(0);
-          setIsAnimating(false);
+          setIsAnimating(true);
           
           // Reset the game with the puzzle position
           const newGame = new Chess();
@@ -48,23 +48,34 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           setPuzzleFailed(false);
           setHighlightedSquares({});
           
-          // Set board orientation based on who moves first
+          // Set board orientation to match the side that needs to move after the first move
           setBoardOrientation(currentPuzzle.fen.split(' ')[1] === 'w' ? 'black' : 'white');
           
+          // Wait for state updates to complete
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
           // Make the first move (opponent's move)
-          await new Promise(resolve => setTimeout(resolve, 100));
           const firstMove = currentPuzzle.moves[0];
-          newGame.move(firstMove);
+          const [fromSquare, toSquare] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
+          newGame.move({
+            from: fromSquare,
+            to: toSquare,
+            promotion: firstMove[4] || 'q'
+          });
+          
+          // Update game state with the new position
+          setGame(new Chess(newGame.fen()));
           
           // Highlight the move
           setHighlightedSquares({
-            [firstMove.slice(0, 2)]: HIGHLIGHT_COLOR,
-            [firstMove.slice(2, 4)]: HIGHLIGHT_COLOR
+            [fromSquare]: HIGHLIGHT_COLOR,
+            [toSquare]: HIGHLIGHT_COLOR
           });
           
-          // Re-enable animations
+          // Re-enable animations after a short delay
+          await new Promise(resolve => setTimeout(resolve, 100));
           setTransitionDuration(150);
-          setGame(newGame);
+          setIsAnimating(false);
         }
       } catch (error) {
         console.error('Error setting up puzzle:', error);
