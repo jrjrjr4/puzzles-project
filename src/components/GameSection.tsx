@@ -39,6 +39,10 @@ export default function GameSection() {
   // Add performance measurement
   const transitionStartTime = useRef<number | null>(null);
 
+  // Add transition handling
+  const [isTransitioningBoard, setIsTransitioningBoard] = useState(false);
+  const transitionTimeoutRef = useRef<NodeJS.Timeout>();
+
   // Effect to log state changes
   useEffect(() => {
     console.group('🔄 [GameSection] State Update');
@@ -253,6 +257,26 @@ export default function GameSection() {
     loadPuzzles();
   }, []);
 
+  // Effect to handle puzzle transitions
+  useEffect(() => {
+    if (currentPuzzle?.id) {
+      setIsTransitioningBoard(true);
+      // Clear any existing transition timeout
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+      // Set a short timeout to ensure smooth transition
+      transitionTimeoutRef.current = setTimeout(() => {
+        setIsTransitioningBoard(false);
+      }, 50);
+    }
+    return () => {
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, [currentPuzzle?.id]);
+
   const loadNextPuzzle = async () => {
     console.group('🎯 [Next Puzzle] Transition Start');
     transitionStartTime.current = Date.now();
@@ -266,6 +290,7 @@ export default function GameSection() {
     try {
       isLoadingPuzzle.current = true;
       setIsTransitioning(true);
+      setIsTransitioningBoard(true);  // Start board transition
       console.log('📊 [Next Puzzle] Current State:', {
         currentPuzzleId: currentPuzzle?.id,
         precomputedId: precomputedNextPuzzle?.id,
@@ -329,6 +354,7 @@ export default function GameSection() {
     } finally {
       isLoadingPuzzle.current = false;
       setIsTransitioning(false);
+      // Board transition will be cleared by the effect
       const transitionTime = Date.now() - (transitionStartTime.current || Date.now());
       console.log('✨ [Next Puzzle] Transition complete in', transitionTime, 'ms');
       console.groupEnd();
@@ -372,7 +398,15 @@ export default function GameSection() {
               </div>
             )}
             <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
-              <div style={{ width: boardSize ? `${boardSize}px` : '100%', maxWidth: '100%' }} className="relative">
+              <div 
+                style={{ 
+                  width: boardSize ? `${boardSize}px` : '100%', 
+                  maxWidth: '100%',
+                  opacity: isTransitioningBoard ? 0 : 1,
+                  transition: 'opacity 0.05s ease-in-out'
+                }} 
+                className="relative"
+              >
                 {boardSize > 0 && currentPuzzle && (
                   <Chessboard size={boardSize} onPuzzleComplete={handlePuzzleComplete} />
                 )}
