@@ -278,10 +278,12 @@ export default function GameSection() {
   }, [currentPuzzle?.id]);
 
   const loadNextPuzzle = async () => {
-    console.log('🎯 [Next Puzzle] Transition Start');
-    transitionStartTime.current = Date.now();
+    console.log('🎯 [Next] Loading next puzzle');
+    setPuzzleSolved(false); // Reset puzzle completion state
+    setPuzzleFailed(false);
     setIsTransitioning(true);
     setIsTransitioningBoard(true);
+    transitionStartTime.current = Date.now();
 
     try {
       if (cachedPuzzles.length === 0) {
@@ -363,10 +365,13 @@ export default function GameSection() {
   };
 
   const handlePuzzleComplete = (solved: boolean) => {
-    // Set puzzle completion states
-    setPuzzleSolved(solved);
-    setPuzzleFailed(!solved);
-    
+    if (solved) {
+      setPuzzleSolved(true);
+      setPuzzleFailed(false);
+    } else {
+      setPuzzleSolved(false);
+      setPuzzleFailed(true);
+    }
     // Reset loading states when puzzle is completed
     setIsLoading(false);
     isLoadingPuzzle.current = false;
@@ -390,7 +395,7 @@ export default function GameSection() {
           </div>
         ) : (
           <>
-            {(puzzleSolved || puzzleFailed) && (
+            {(puzzleSolved || puzzleFailed) && !isTransitioning && (
               <div className="absolute top-4 left-4 z-10">
                 <button
                   onClick={loadNextPuzzle}
