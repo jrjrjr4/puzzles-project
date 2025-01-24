@@ -14,14 +14,30 @@ export function Auth() {
     e.preventDefault();
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      if (!email) {
+        throw new Error('Please enter your email address');
+      }
+      if (!password) {
+        throw new Error('Please choose a password');
+      }
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin
+        }
       });
       if (error) throw error;
+      if (data?.user?.identities?.length === 0) {
+        throw new Error('This email is already registered. Please sign in instead.');
+      }
       alert('Check your email for the confirmation link!');
     } catch (error) {
-      dispatch(setError((error as Error).message));
+      console.error('Signup error:', error);
+      dispatch(setError(error instanceof Error ? error.message : 'An error occurred during signup'));
     } finally {
       setLoading(false);
     }
@@ -85,12 +101,12 @@ export function Auth() {
     <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
-          Sign in to your account
+          {email ? 'Choose a password' : 'Enter your email'}
         </h2>
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-        <form className="space-y-6">
+        <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
               Email address
@@ -118,11 +134,12 @@ export function Auth() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
+                placeholder="At least 6 characters"
               />
             </div>
           </div>
@@ -141,7 +158,7 @@ export function Auth() {
               type="button"
               className="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-blue-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
             >
-              {loading ? 'Loading...' : 'Sign up'}
+              {loading ? 'Loading...' : 'Create account'}
             </button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
