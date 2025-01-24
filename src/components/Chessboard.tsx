@@ -165,29 +165,6 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
     }
   };
 
-  function renderGameStatus() {
-    if (!currentPuzzle) return null;
-
-    return (
-      <div className="text-center">
-        {puzzleSolved && (
-          <div className="space-y-4">
-            <div className="bg-green-100 text-green-800 p-4 rounded-lg">
-              Puzzle Solved!
-            </div>
-          </div>
-        )}
-        {puzzleFailed && (
-          <div className="space-y-4">
-            <div className="bg-red-100 text-red-800 p-4 rounded-lg">
-              Try again!
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="w-full aspect-square">
@@ -204,7 +181,6 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           }}
         />
       </div>
-      {renderGameStatus()}
     </div>
   );
 }

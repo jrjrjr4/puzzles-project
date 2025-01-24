@@ -395,17 +395,6 @@ export default function GameSection() {
           </div>
         ) : (
           <>
-            {(puzzleSolved || puzzleFailed) && !isTransitioning && (
-              <div className="absolute top-4 left-4 z-10">
-                <button
-                  onClick={loadNextPuzzle}
-                  disabled={isLoadingPuzzle.current}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base font-medium shadow-md hover:shadow-lg transition-all"
-                >
-                  {isLoadingPuzzle.current ? 'Loading...' : 'Next Puzzle'}
-                </button>
-              </div>
-            )}
             <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
               <div 
                 style={{ 
@@ -422,6 +411,27 @@ export default function GameSection() {
                 {!currentPuzzle && !isInitialLoad && (
                   <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  </div>
+                )}
+                {(puzzleSolved || puzzleFailed) && !isTransitioning && (
+                  <div className="flex justify-center mt-4 items-center gap-2">
+                    <button
+                      onClick={loadNextPuzzle}
+                      disabled={isLoadingPuzzle.current}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg font-medium shadow-md hover:shadow-lg transition-all"
+                    >
+                      {isLoadingPuzzle.current ? 'Loading...' : 'Next Puzzle'}
+                    </button>
+                    {puzzleSolved && (
+                      <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {puzzleFailed && (
+                      <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
                   </div>
                 )}
                 <div
