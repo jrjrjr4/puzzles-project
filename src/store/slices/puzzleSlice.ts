@@ -10,6 +10,7 @@ import { RootState } from '../../store/store';
 interface RatingWithDeviation {
   rating: number;
   ratingDeviation: number;
+  attempts: number;
 }
 
 interface RatingUpdate {
@@ -18,6 +19,7 @@ interface RatingUpdate {
   oldRD: number;
   newRD: number;
   change: number;
+  attempts: number;
 }
 
 interface PuzzleState {
@@ -119,13 +121,19 @@ const puzzleSlice = createSlice({
           ? state.currentPuzzle.themes 
           : ['Tactics'];
 
+        // Initialize overall rating with attempts if not present
+        if (!state.userRatings.overall.attempts) {
+          state.userRatings.overall.attempts = 0;
+        }
+
         const updates: PuzzleState['lastRatingUpdates'] = {
           overall: calculateRatingChange(
             state.userRatings.overall.rating,
             state.userRatings.overall.ratingDeviation,
             state.currentPuzzle.rating,
             state.currentPuzzle.ratingDeviation,
-            score
+            score,
+            state.userRatings.overall.attempts
           ),
           categories: {}
         };
@@ -133,16 +141,18 @@ const puzzleSlice = createSlice({
         console.log('Overall rating update:', {
           old: state.userRatings.overall.rating,
           new: updates.overall.newRating,
-          change: updates.overall.newRating - state.userRatings.overall.rating
+          change: updates.overall.newRating - state.userRatings.overall.rating,
+          attempts: updates.overall.attempts
         });
 
-        // Update overall rating
+        // Update overall rating with attempts
         state.userRatings.overall = {
           rating: updates.overall.newRating,
-          ratingDeviation: updates.overall.newRD
+          ratingDeviation: updates.overall.newRD,
+          attempts: updates.overall.attempts
         };
 
-        // Update category ratings
+        // Update category ratings with attempts tracking
         categoriesToUpdate.forEach(category => {
           if (!category) return;
           
@@ -150,7 +160,8 @@ const puzzleSlice = createSlice({
           
           const categoryRating = state.userRatings.categories[category] || {
             rating: 1600,
-            ratingDeviation: BASE_RD
+            ratingDeviation: BASE_RD,
+            attempts: 0
           };
 
           const update = calculateRatingChange(
@@ -158,18 +169,21 @@ const puzzleSlice = createSlice({
             categoryRating.ratingDeviation,
             state.currentPuzzle!.rating,
             state.currentPuzzle!.ratingDeviation,
-            score
+            score,
+            categoryRating.attempts
           );
 
           console.log(`Category ${category} rating update:`, {
             old: categoryRating.rating,
             new: update.newRating,
-            change: update.newRating - categoryRating.rating
+            change: update.newRating - categoryRating.rating,
+            attempts: update.attempts
           });
 
           state.userRatings.categories[category] = {
             rating: update.newRating,
-            ratingDeviation: update.newRD
+            ratingDeviation: update.newRD,
+            attempts: update.attempts
           };
 
           updates.categories[category] = update;
@@ -286,27 +300,24 @@ const puzzleSlice = createSlice({
     loadUserRatings: (state, action: PayloadAction<{ ratings: any }>) => {
       console.log('Loading user ratings:', JSON.stringify(action.payload.ratings, null, 2));
       
-      // For first-time users or when ratings are empty, set default ratings for all categories
-      const defaultRating = {
-        rating: 1600,
-        ratingDeviation: BASE_RD
-      };
-
-      // Get all category names from the categories array
-      const allCategories = categories.map((c: { name: string }) => c.name);
-      
-      // Create a default categories object with 1200 rating for each category
+      // Create default ratings for all categories
+      const defaultRating = { rating: 1200, ratingDeviation: BASE_RD, attempts: 0 };
       const defaultCategories: Record<string, RatingWithDeviation> = {};
-      allCategories.forEach((category: string) => {
-        defaultCategories[category] = { ...defaultRating };
+      categories.forEach((c: { name: string }) => {
+        defaultCategories[c.name] = { ...defaultRating };
       });
+
+      const defaultRatings = {
+        overall: defaultRating,
+        categories: defaultCategories
+      };
 
       // Ensure we have valid ratings object with all required properties
       const newRatings = {
         loaded: true,
-        overall: action.payload.ratings.overall || defaultRating,
+        overall: action.payload.ratings.overall || defaultRatings.overall,
         categories: {
-          ...defaultCategories,  // Start with default ratings for all categories
+          ...defaultRatings.categories,  // Start with default ratings for all categories
           ...action.payload.ratings.categories  // Override with any existing ratings
         }
       };
@@ -370,22 +381,20 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
         console.log('Creating initial ratings record for user');
         
         // Create default ratings for all categories
-        const defaultRating = { rating: 1200, ratingDeviation: BASE_RD };
-        const defaultCategories: Record<string, RatingWithDeviation> = {};
-        categories.forEach((c: { name: string }) => {
-          defaultCategories[c.name] = { ...defaultRating };
-        });
-
-        const defaultRatings = {
-          overall: defaultRating,
-          categories: defaultCategories
+        const initialRatings = {
+          overall: {
+            rating: 1600,
+            ratingDeviation: BASE_RD,
+            attempts: 0
+          },
+          categories: {}
         };
         
         const { error: insertError } = await supabase
           .from('user_ratings')
           .insert({
             user_id: userId,
-            ratings: defaultRatings,
+            ratings: initialRatings,
             updated_at: new Date().toISOString()
           });
 
@@ -393,7 +402,7 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
           console.error('❌ Error creating initial ratings:', insertError);
         } else {
           console.log('✅ Created initial ratings');
-          dispatch(loadUserRatings({ ratings: defaultRatings }));
+          dispatch(loadUserRatings({ ratings: initialRatings }));
         }
       }
       return;
@@ -545,7 +554,8 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
           userRatings.overall.ratingDeviation,
           currentPuzzle.rating,
           currentPuzzle.ratingDeviation,
-          score
+          score,
+          userRatings.overall.attempts
         ),
         categories: {}
       };
@@ -553,7 +563,8 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
       console.log('Overall rating update:', {
         old: userRatings.overall.rating,
         new: updates.overall.newRating,
-        change: updates.overall.newRating - userRatings.overall.rating
+        change: updates.overall.newRating - userRatings.overall.rating,
+        attempts: updates.overall.attempts
       });
 
       // Update category ratings
@@ -564,7 +575,8 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
         
         const categoryRating = userRatings.categories[category] || {
           rating: 1600,
-          ratingDeviation: BASE_RD
+          ratingDeviation: BASE_RD,
+          attempts: 0
         };
 
         const update = calculateRatingChange(
@@ -572,13 +584,15 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
           categoryRating.ratingDeviation,
           currentPuzzle.rating,
           currentPuzzle.ratingDeviation,
-          score
+          score,
+          categoryRating.attempts
         );
 
         console.log(`Category ${category} rating update:`, {
           old: categoryRating.rating,
           new: update.newRating,
-          change: update.newRating - categoryRating.rating
+          change: update.newRating - categoryRating.rating,
+          attempts: update.attempts
         });
 
         updates.categories[category] = update;
@@ -592,14 +606,16 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
           session.ratings = {
             overall: {
               rating: updates.overall.newRating,
-              ratingDeviation: updates.overall.newRD
+              ratingDeviation: updates.overall.newRD,
+              attempts: updates.overall.attempts
             },
             categories: Object.fromEntries(
               Object.entries(updates.categories).map(([category, update]) => [
                 category,
                 {
                   rating: update.newRating,
-                  ratingDeviation: update.newRD
+                  ratingDeviation: update.newRD,
+                  attempts: update.attempts
                 }
               ])
             )
@@ -622,14 +638,16 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
             ratings: {
               overall: {
                 rating: updates.overall.newRating,
-                ratingDeviation: updates.overall.newRD
+                ratingDeviation: updates.overall.newRD,
+                attempts: updates.overall.attempts
               },
               categories: Object.fromEntries(
                 Object.entries(updates.categories).map(([category, update]) => [
                   category,
                   {
                     rating: update.newRating,
-                    ratingDeviation: update.newRD
+                    ratingDeviation: update.newRD,
+                    attempts: update.attempts
                   }
                 ])
               )
