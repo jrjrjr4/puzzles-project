@@ -4,6 +4,8 @@ import { calculateRatingChange, calculateAverageRating, BASE_RD } from '../../ut
 import { themeToCategory } from '../../data/categories';
 import { supabase } from '../../utils/supabase';
 import { categories } from '../../data/categories';
+import { createAsyncThunk } from '@reduxjs/toolkit';
+import { RootState } from '../../store/store';
 
 interface RatingWithDeviation {
   rating: number;
@@ -511,3 +513,141 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
     console.error('❌ Error in fetchLastPuzzle:', error);
   }
 };
+
+export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
+  'puzzle/updateRatingsAfterPuzzleAsync',
+  async ({ success, userId }: { success: boolean; userId?: string }, { getState }) => {
+    const state = getState() as RootState;
+    const currentPuzzle = state.puzzle.currentPuzzle;
+    const userRatings = state.puzzle.userRatings;
+    const isGuest = state.auth.user?.user_metadata?.is_guest;
+
+    if (!currentPuzzle || !userRatings.overall) {
+      console.warn('⚠️ No current puzzle or ratings not loaded, skipping rating update');
+      return;
+    }
+
+    try {
+      const score = success ? 1 : 0;
+      console.log('Puzzle details:', {
+        id: currentPuzzle.id,
+        rating: currentPuzzle.rating,
+        themes: currentPuzzle.themes
+      });
+      
+      const categoriesToUpdate = currentPuzzle.themes.length > 0 
+        ? currentPuzzle.themes 
+        : ['Tactics'];
+
+      const updates: PuzzleState['lastRatingUpdates'] = {
+        overall: calculateRatingChange(
+          userRatings.overall.rating,
+          userRatings.overall.ratingDeviation,
+          currentPuzzle.rating,
+          currentPuzzle.ratingDeviation,
+          score
+        ),
+        categories: {}
+      };
+
+      console.log('Overall rating update:', {
+        old: userRatings.overall.rating,
+        new: updates.overall.newRating,
+        change: updates.overall.newRating - userRatings.overall.rating
+      });
+
+      // Update category ratings
+      categoriesToUpdate.forEach(category => {
+        if (!category) return;
+        
+        console.log(`Processing category: ${category}`);
+        
+        const categoryRating = userRatings.categories[category] || {
+          rating: 1200,
+          ratingDeviation: BASE_RD
+        };
+
+        const update = calculateRatingChange(
+          categoryRating.rating,
+          categoryRating.ratingDeviation,
+          currentPuzzle.rating,
+          currentPuzzle.ratingDeviation,
+          score
+        );
+
+        console.log(`Category ${category} rating update:`, {
+          old: categoryRating.rating,
+          new: update.newRating,
+          change: update.newRating - categoryRating.rating
+        });
+
+        updates.categories[category] = update;
+      });
+
+      // If this is a guest user, update the guest session in localStorage
+      if (isGuest) {
+        const guestSession = localStorage.getItem('guestSession');
+        if (guestSession) {
+          const session = JSON.parse(guestSession);
+          session.ratings = {
+            overall: {
+              rating: updates.overall.newRating,
+              ratingDeviation: updates.overall.newRD
+            },
+            categories: Object.fromEntries(
+              Object.entries(updates.categories).map(([category, update]) => [
+                category,
+                {
+                  rating: update.newRating,
+                  ratingDeviation: update.newRD
+                }
+              ])
+            )
+          };
+          session.solvedPuzzles = [...(session.solvedPuzzles || []), currentPuzzle.id];
+          session.lastPuzzleState = currentPuzzle;
+          localStorage.setItem('guestSession', JSON.stringify(session));
+          console.log('💾 Successfully saved guest session to localStorage');
+        }
+      }
+      // If user is logged in, save to Supabase
+      else if (userId) {
+        console.log('🔄 Saving to Supabase for user:', userId);
+        
+        // Create a Promise to handle the async operation
+        const { error } = await supabase
+          .from('user_ratings')
+          .upsert({
+            user_id: userId,
+            ratings: {
+              overall: {
+                rating: updates.overall.newRating,
+                ratingDeviation: updates.overall.newRD
+              },
+              categories: Object.fromEntries(
+                Object.entries(updates.categories).map(([category, update]) => [
+                  category,
+                  {
+                    rating: update.newRating,
+                    ratingDeviation: update.newRD
+                  }
+                ])
+              )
+            },
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('❌ Error saving ratings to Supabase:', error);
+        } else {
+          console.log('✅ Successfully saved ratings to Supabase');
+        }
+      }
+
+      return updates;
+    } catch (error) {
+      console.error('❌ Error updating ratings:', error);
+      throw error;
+    }
+  }
+);

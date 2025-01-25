@@ -4,9 +4,10 @@ import Chessboard from './Chessboard';
 import CategoryRatings from './CategoryRatings';
 import PuzzleInfo from './PuzzleInfo';
 import { parsePuzzleCsv } from '../utils/puzzles';
-import { setCurrentPuzzle, loadLastPuzzle, saveCurrentPuzzle, fetchLastPuzzle } from '../store/slices/puzzleSlice';
+import { setCurrentPuzzle, loadLastPuzzle, saveCurrentPuzzle, fetchLastPuzzle, updateRatingsAfterPuzzleAsync } from '../store/slices/puzzleSlice';
 import { getNextPuzzle } from '../utils/puzzleSelector';
 import { RootState, AppDispatch } from '../store/store';
+import { Puzzle } from '../types/puzzle';
 
 export default function GameSection() {
   const dispatch = useDispatch<AppDispatch>();
@@ -110,9 +111,9 @@ export default function GameSection() {
     console.log('🏷️ [Mount] lastUserId:', lastUserId.current);
     console.log('📚 [Mount] Cached puzzles:', cachedPuzzles.length);
 
-    // Skip initialization if auth is still loading or we don't have puzzles yet
-    if (isAuthLoading || cachedPuzzles.length === 0) {
-      console.log('⏳ [Mount] Skipping initialization - Auth loading or no puzzles yet');
+    // Skip initialization if we don't have puzzles yet
+    if (cachedPuzzles.length === 0) {
+      console.log('⏳ [Mount] Skipping initialization - No puzzles yet');
       return;
     }
 
@@ -150,26 +151,9 @@ export default function GameSection() {
           lastUserId.current = user?.id || null;
         }
         
-        // For guest users, skip fetching last puzzle and just load a new one
-        if (user?.user_metadata?.is_guest) {
-          console.log('👥 [Initialize] Guest user detected, loading new puzzle');
-          await loadNextPuzzle();
-        } else if (user?.id) {
-          console.log('📖 [Initialize] Fetching last puzzle for user:', user.id);
-          const result = await dispatch(fetchLastPuzzle(user.id)) as any;
-          console.log('📦 [Initialize] Fetch result:', result?.payload?.id);
-          
-          if (!mounted) {
-            console.log('⚠️ [Initialize] Aborted - Component unmounted during fetch');
-            return;
-          }
-          
-          if (!result?.payload && mounted) {
-            console.log('🎯 [Initialize] No last puzzle found, loading new puzzle');
-            await loadNextPuzzle();
-          }
-        } else if (!currentPuzzle && mounted) {
-          console.log('🎯 [Initialize] Anonymous user, loading new puzzle');
+        // For guest users or no user, load a new puzzle if none exists
+        if (!currentPuzzle) {
+          console.log('🎯 [Initialize] No current puzzle, loading new one');
           await loadNextPuzzle();
         }
       } catch (error) {
@@ -197,7 +181,7 @@ export default function GameSection() {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [dispatch, user?.id, currentPuzzle, isAuthLoading, cachedPuzzles.length]);
+  }, [dispatch, user?.id, currentPuzzle, cachedPuzzles.length]);
 
   // Save puzzle when it changes
   useEffect(() => {
@@ -364,22 +348,49 @@ export default function GameSection() {
     }
   };
 
-  const handlePuzzleComplete = (solved: boolean) => {
-    if (solved) {
-      setPuzzleSolved(true);
-      setPuzzleFailed(false);
-    } else {
-      setPuzzleSolved(false);
-      setPuzzleFailed(true);
-    }
-    // Reset loading states when puzzle is completed
-    setIsLoading(false);
-    isLoadingPuzzle.current = false;
+  const handlePuzzleComplete = async (solved: boolean) => {
+    console.group('🎯 Puzzle Complete');
+    console.log('Result:', solved ? 'Solved ✅' : 'Failed ❌');
     
-    // Clear any pending loading timeouts
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
+    setPuzzleSolved(solved);
+    setPuzzleFailed(!solved);
+    
+    // Update ratings
+    if (currentPuzzle) {
+      await dispatch(updateRatingsAfterPuzzleAsync({ success: solved, userId: user?.id }));
     }
+
+    // Don't auto-transition, wait for user to click next
+    setIsTransitioning(false);
+    console.groupEnd();
+  };
+
+  const handleNextPuzzle = async () => {
+    console.group('🔄 Next Puzzle');
+    setIsTransitioning(true);
+    transitionStartTime.current = Date.now();
+
+    try {
+      // Use precomputed puzzle if available
+      if (precomputedNextPuzzle) {
+        console.log('Using precomputed puzzle:', precomputedNextPuzzle.id);
+        setPreviousPuzzle(currentPuzzle as Puzzle);
+        dispatch(setCurrentPuzzle(precomputedNextPuzzle));
+        setPrecomputedNextPuzzle(null);
+      } else {
+        console.log('Loading new puzzle');
+        await loadNextPuzzle();
+      }
+
+      // Reset puzzle state
+      setPuzzleSolved(false);
+      setPuzzleFailed(false);
+      setIsTransitioning(false);
+    } catch (error) {
+      console.error('Error loading next puzzle:', error);
+      setError('Failed to load next puzzle');
+    }
+    console.groupEnd();
   };
 
   return (
@@ -416,7 +427,7 @@ export default function GameSection() {
                 {(puzzleSolved || puzzleFailed) && !isTransitioning && (
                   <div className="flex justify-center mt-4 items-center gap-2">
                     <button
-                      onClick={loadNextPuzzle}
+                      onClick={handleNextPuzzle}
                       disabled={isLoadingPuzzle.current}
                       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg font-medium shadow-md hover:shadow-lg transition-all"
                     >

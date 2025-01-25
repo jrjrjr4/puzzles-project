@@ -6,6 +6,30 @@ import { setUser, setLoading } from '../store/slices/authSlice';
 import { fetchUserRatings, loadUserRatings } from '../store/slices/puzzleSlice';
 import { AppDispatch } from '../store/store';
 
+const GUEST_SESSION_KEY = 'guestSession';
+
+interface GuestSession {
+  guestId: string;
+  ratings: {
+    overall: { rating: number; ratingDeviation: number };
+    categories: Record<string, { rating: number; ratingDeviation: number }>;
+  };
+  lastPuzzleState: any;
+  solvedPuzzles: string[];
+}
+
+const createGuestSession = (): GuestSession => {
+  return {
+    guestId: `guest_${Math.random().toString(36).substring(2, 15)}`,
+    ratings: {
+      overall: { rating: 1200, ratingDeviation: 350 },
+      categories: {}
+    },
+    lastPuzzleState: null,
+    solvedPuzzles: []
+  };
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>();
   const ratingsLoaded = useRef(false);
@@ -23,15 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (isGuest) {
         // For guest users, try to load from localStorage first
-        const savedRatings = localStorage.getItem(`guest_ratings_${session.user.id}`);
-        if (savedRatings) {
+        const savedSession = localStorage.getItem(GUEST_SESSION_KEY);
+        if (savedSession) {
           try {
-            const parsedRatings = JSON.parse(savedRatings);
-            console.log('Found saved guest ratings:', parsedRatings);
-            dispatch(loadUserRatings({ ratings: parsedRatings }));
+            const guestSession: GuestSession = JSON.parse(savedSession);
+            console.log('Found saved guest session:', guestSession);
+            dispatch(loadUserRatings({ ratings: guestSession.ratings }));
             return;
           } catch (err) {
-            console.error('❌ Error parsing saved guest ratings:', err);
+            console.error('❌ Error parsing saved guest session:', err);
           }
         }
       }
@@ -39,16 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If not a guest or no saved ratings, fetch from Supabase
       dispatch(fetchUserRatings(session.user.id));
     } else {
-      // Clear any existing ratings from localStorage when logged out
-      localStorage.removeItem('chess_puzzle_ratings');
+      // Create new guest session if none exists
+      let guestSession = localStorage.getItem(GUEST_SESSION_KEY);
       
-      // Set default ratings for anonymous users
-      console.log('Setting default ratings for anonymous user');
-      dispatch(loadUserRatings({
-        ratings: {
-          overall: { rating: 1200, ratingDeviation: 350 },
-          categories: {}
-        }
+      if (!guestSession) {
+        const newGuestSession = createGuestSession();
+        localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(newGuestSession));
+        guestSession = JSON.stringify(newGuestSession);
+      }
+      
+      const parsedSession: GuestSession = JSON.parse(guestSession);
+      dispatch(loadUserRatings({ ratings: parsedSession.ratings }));
+      
+      // Set guest user in auth state
+      dispatch(setUser({
+        id: parsedSession.guestId,
+        email: undefined,
+        user_metadata: { is_guest: true },
+        app_metadata: {},
+        aud: 'guest',
+        created_at: new Date().toISOString(),
+        role: 'authenticated',
+        updated_at: new Date().toISOString()
       }));
     }
     ratingsLoaded.current = true;
@@ -57,29 +93,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🔐 Auth Provider Initialization');
 
+    // Check for existing session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session ? 'Session found' : 'No session');
+      
+      if (session) {
+        dispatch(setUser(session.user));
+        loadRatings(session);
+      } else {
+        // No session, load guest session
+        loadRatings(null);
+      }
+    });
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 Auth State Change');
       console.log('Event:', event);
       console.log('Session:', session ? 'User logged in' : 'User logged out');
 
-      // Reset ratingsLoaded flag on sign in/out to ensure fresh load
-      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
-        localStorage.removeItem('chess_puzzle_ratings');
-        ratingsLoaded.current = false;
+      dispatch(setLoading(true));
+
+      if (session) {
+        dispatch(setUser(session.user));
+        await loadRatings(session);
+      } else {
+        // On sign out, load guest session
+        await loadRatings(null);
       }
 
-      dispatch(setLoading(true));
-      dispatch(setUser(session?.user || null));
-      await loadRatings(session);
       dispatch(setLoading(false));
-    });
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session ? 'Session found' : 'No session');
-      dispatch(setUser(session?.user || null));
-      loadRatings(session);
     });
 
     return () => {
