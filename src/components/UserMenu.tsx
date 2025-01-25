@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store/store';
 import { User, LogOut, Settings, UserCircle, LogIn, X } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { loadUserRatings } from '../store/slices/puzzleSlice';
+import { categories } from '../data/categories';
 
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,6 +17,7 @@ export default function UserMenu() {
   const modalRef = useRef<HTMLDivElement>(null);
   const { user } = useSelector((state: RootState) => state.auth);
   const isGuest = user?.user_metadata?.is_guest;
+  const dispatch = useDispatch();
 
   // Debug current user state
   useEffect(() => {
@@ -111,6 +114,58 @@ export default function UserMenu() {
     }
   };
 
+  const handleResetRatings = async () => {
+    console.group('🔄 Reset Ratings Process');
+    try {
+      // Create default ratings with 1600 for all categories
+      const defaultRating = { rating: 1600, ratingDeviation: 350 };
+      const defaultCategories: Record<string, typeof defaultRating> = {};
+      categories.forEach((c: { name: string }) => {
+        defaultCategories[c.name] = { ...defaultRating };
+      });
+
+      const defaultRatings = {
+        loaded: true,
+        overall: defaultRating,
+        categories: defaultCategories
+      };
+
+      // Update Redux state
+      dispatch(loadUserRatings({ ratings: defaultRatings }));
+
+      if (isGuest) {
+        // Update guest session in localStorage
+        const guestSession = localStorage.getItem('guestSession');
+        if (guestSession) {
+          const session = JSON.parse(guestSession);
+          session.ratings = defaultRatings;
+          localStorage.setItem('guestSession', JSON.stringify(session));
+          console.log('💾 Successfully reset guest ratings');
+        }
+      } else if (user?.id) {
+        // Update ratings in Supabase for logged-in users
+        const { error } = await supabase
+          .from('user_ratings')
+          .upsert({
+            user_id: user.id,
+            ratings: defaultRatings,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('❌ Error resetting ratings in Supabase:', error);
+          throw error;
+        }
+        console.log('✅ Successfully reset ratings in Supabase');
+      }
+
+      setIsOpen(false);
+    } catch (error) {
+      console.error('❌ Error resetting ratings:', error);
+    }
+    console.groupEnd();
+  };
+
   return (
     <>
       <div className="relative" ref={dropdownRef}>
@@ -133,6 +188,13 @@ export default function UserMenu() {
                 </div>
                 <hr className="my-1" />
                 <button
+                  onClick={handleResetRatings}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Reset Ratings
+                </button>
+                <button
                   onClick={() => {
                     setShowSignInModal(true);
                     setIsOpen(false);
@@ -149,9 +211,12 @@ export default function UserMenu() {
                   <User className="w-4 h-4" />
                   Profile
                 </button>
-                <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                <button
+                  onClick={handleResetRatings}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
                   <Settings className="w-4 h-4" />
-                  Settings
+                  Reset Ratings
                 </button>
                 <hr className="my-1" />
                 <button
