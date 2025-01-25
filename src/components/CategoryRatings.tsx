@@ -33,8 +33,8 @@ export default function CategoryRatings() {
 
   // Sort categories by actual user ratings
   const sortedCategories = [...categories].sort((a, b) => {
-    const ratingA = userRatings.categories[a.name]?.rating || 1200;
-    const ratingB = userRatings.categories[b.name]?.rating || 1200;
+    const ratingA = userRatings.categories[a.name]?.rating || 1600;
+    const ratingB = userRatings.categories[b.name]?.rating || 1600;
     return ratingB - ratingA;
   });
 
@@ -52,7 +52,7 @@ export default function CategoryRatings() {
                 key={category.name}
                 category={{
                   ...category,
-                  rating: userRatings.categories[category.name]?.rating || 1200,
+                  rating: userRatings.categories[category.name]?.rating || 1600,
                   ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}
@@ -69,7 +69,7 @@ export default function CategoryRatings() {
                 key={category.name}
                 category={{
                   ...category,
-                  rating: userRatings.categories[category.name]?.rating || 1200,
+                  rating: userRatings.categories[category.name]?.rating || 1600,
                   ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}

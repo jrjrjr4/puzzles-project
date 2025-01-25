@@ -3,53 +3,53 @@ import { CategoryRating } from '../types/category';
 export const categories: CategoryRating[] = [
   {
     name: 'Mate',
-    rating: 1200,
-    description: 'Checkmate patterns and sequences'
+    rating: 1600,
+    description: 'Checkmate puzzles'
   },
   {
     name: 'Endgame',
-    rating: 1200,
-    description: 'Critical endgame positions'
+    rating: 1600,
+    description: 'Endgame puzzles'
   },
   {
     name: 'Defense',
-    rating: 1200,
-    description: 'Find the best defensive move'
+    rating: 1600,
+    description: 'Defensive puzzles'
   },
   {
     name: 'Pin',
-    rating: 1200,
-    description: 'Pin pieces to important squares'
+    rating: 1600,
+    description: 'Pin puzzles'
   },
   {
     name: 'Deflection',
-    rating: 1200,
-    description: 'Force a piece away from an important square'
+    rating: 1600,
+    description: 'Deflection puzzles'
   },
   {
     name: 'Discovered Attack',
-    rating: 1200,
-    description: 'Move one piece to reveal an attack from another'
+    rating: 1600,
+    description: 'Discovered attack puzzles'
   },
   {
     name: 'Kingside Attack',
-    rating: 1200,
-    description: 'Attack the opponent\'s kingside'
+    rating: 1600,
+    description: 'Kingside attack puzzles'
   },
   {
     name: 'Fork',
-    rating: 1200,
-    description: 'Attack multiple pieces at once'
+    rating: 1600,
+    description: 'Fork puzzles'
   },
   {
     name: 'Capturing Defender',
-    rating: 1200,
-    description: 'Remove a key defensive piece'
+    rating: 1600,
+    description: 'Capturing defender puzzles'
   },
   {
     name: 'Quiet Move',
-    rating: 1200,
-    description: 'A subtle move that prepares a tactical strike'
+    rating: 1600,
+    description: 'Quiet move puzzles'
   }
 ];
 
@@ -68,6 +68,7 @@ export const themeToCategory: Record<string, string> = {
   'fork': 'Fork',
   'hanging': 'Hanging Piece',
   'interference': 'Interference',
+  
   'kingsideAttack': 'Kingside Attack',
   'mate': 'Mate',
   'mateIn1': 'Mate in 1',

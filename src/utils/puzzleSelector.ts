@@ -4,7 +4,7 @@ import { Puzzle } from '../types/puzzle';
 const ALPHA = 0.8;  // Weight for theme selection based on rating differences
 const BETA = 1.0;   // Weight for puzzle popularity in scoring
 const GAMMA = 1.0;  // Weight for rating difference impact in scoring
-const DEFAULT_RATING = 1200;  // Default rating for new themes
+const DEFAULT_RATING = 1600;  // Default rating for new themes
 
 // Update rating range to be tighter
 const RATING_RANGE = 150; // Look for puzzles within ±150 of user's rating

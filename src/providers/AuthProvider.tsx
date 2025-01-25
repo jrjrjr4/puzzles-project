@@ -24,7 +24,7 @@ const createGuestSession = (): GuestSession => {
   return {
     guestId: `guest_${Math.random().toString(36).substring(2, 15)}`,
     ratings: {
-      overall: { rating: 1200, ratingDeviation: 350 },
+      overall: { rating: 1600, ratingDeviation: 350 },
       categories: {}
     },
     lastPuzzleState: null,

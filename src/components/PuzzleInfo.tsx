@@ -11,7 +11,7 @@ export default function PuzzleInfo() {
     return null;
   }
 
-  const rating = typeof puzzle.rating === 'number' ? puzzle.rating : 1200;
+  const rating = typeof puzzle.rating === 'number' ? puzzle.rating : 1600;
   const ratingDeviation = typeof puzzle.ratingDeviation === 'number' ? puzzle.ratingDeviation : 350;
   const confidence = getRatingConfidence(ratingDeviation);
 

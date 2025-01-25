@@ -69,7 +69,7 @@ export function Auth() {
       // Create default ratings for the guest
       const defaultRatings = {
         loaded: true,
-        overall: { rating: 1200, ratingDeviation: 350 },
+        overall: { rating: 1600, ratingDeviation: 350 },
         categories: {}
       };
 

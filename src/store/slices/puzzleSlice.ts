@@ -149,7 +149,7 @@ const puzzleSlice = createSlice({
           console.log(`Processing category: ${category}`);
           
           const categoryRating = state.userRatings.categories[category] || {
-            rating: 1200,
+            rating: 1600,
             ratingDeviation: BASE_RD
           };
 
@@ -288,7 +288,7 @@ const puzzleSlice = createSlice({
       
       // For first-time users or when ratings are empty, set default ratings for all categories
       const defaultRating = {
-        rating: 1200,
+        rating: 1600,
         ratingDeviation: BASE_RD
       };
 
@@ -563,7 +563,7 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
         console.log(`Processing category: ${category}`);
         
         const categoryRating = userRatings.categories[category] || {
-          rating: 1200,
+          rating: 1600,
           ratingDeviation: BASE_RD
         };
 
