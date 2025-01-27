@@ -40,6 +40,8 @@ interface PuzzleState {
     overall: RatingUpdate;
     categories: Record<string, RatingUpdate>;
   } | null;
+  previousPuzzleId: string | null;
+  lastUpdatedThemes: string[];
 }
 
 const initialState: PuzzleState = {
@@ -50,6 +52,8 @@ const initialState: PuzzleState = {
     categories: {},
   },
   lastRatingUpdates: null,
+  previousPuzzleId: null,
+  lastUpdatedThemes: [],
 };
 
 const puzzleSlice = createSlice({
@@ -70,6 +74,16 @@ const puzzleSlice = createSlice({
       
       try {
         const oldPuzzleId = state.currentPuzzle?.id;
+        state.previousPuzzleId = oldPuzzleId || null;
+        
+        // If we have rating updates, store the themes that were updated
+        if (state.lastRatingUpdates) {
+          state.lastUpdatedThemes = Object.keys(state.lastRatingUpdates.categories);
+        } else {
+          // Clear lastUpdatedThemes when transitioning to a new puzzle without updates
+          state.lastUpdatedThemes = [];
+        }
+        
         state.currentPuzzle = {
           ...action.payload,
           themes: action.payload.themes || ['Tactics'],

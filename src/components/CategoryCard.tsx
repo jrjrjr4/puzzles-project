@@ -50,6 +50,8 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   const ratingUpdate = lastRatingUpdates?.categories[category.name];
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
+  const previousPuzzle = useSelector((state: RootState) => state.puzzle.previousPuzzleId);
+  const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
 
   // Show loading state if ratings aren't loaded yet
   if (!userRatings.loaded) {
@@ -68,6 +70,7 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
 
   // If the rating is 0 or undefined, it means it hasn't been calculated yet
   const hasRating = category.rating !== undefined && category.rating > 0;
+  const wasRecentlyUpdated = lastUpdatedThemes.includes(category.name);
 
   return (
     <div className="p-1.5 bg-gray-50 rounded-lg">
@@ -98,7 +101,9 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
               </div>
             </div>
           ) : (
-            <div className="text-sm font-semibold text-blue-600">
+            <div className={`text-sm font-semibold ${
+              wasRecentlyUpdated ? 'text-yellow-600' : 'text-blue-600'
+            }`}>
               {Math.round(category.rating)}
             </div>
           )}
