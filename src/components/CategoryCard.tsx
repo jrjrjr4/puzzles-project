@@ -101,10 +101,12 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
                 {Math.round(ratingUpdate.newRating)}
               </div>
             </div>
+          ) : wasRecentlyUpdated ? (
+            <div className="text-sm font-semibold text-yellow-600">
+              {Math.round(category.rating)}
+            </div>
           ) : (
-            <div className={`text-sm font-semibold ${
-              wasRecentlyUpdated && !hasNewRatingUpdate ? 'text-yellow-600' : 'text-blue-600'
-            }`}>
+            <div className="text-sm font-semibold text-blue-600">
               {Math.round(category.rating)}
             </div>
           )}

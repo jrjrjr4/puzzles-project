@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Chess, Square } from 'chess.js';
 import { Chessboard as ReactChessboard } from 'react-chessboard';
 import { RootState, AppDispatch } from '../store/store';
-import { updateRatings } from '../store/slices/puzzleSlice';
+import { updateRatingsAfterPuzzleAsync } from '../store/slices/puzzleSlice';
+import { supabase } from '../utils/supabase';
 
 interface ChessboardProps {
   size?: number;
@@ -123,7 +124,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
     );
   }
 
-  const makeMove = (sourceSquare: Square, targetSquare: Square) => {
+  const makeMove = async (sourceSquare: Square, targetSquare: Square) => {
     if (!currentPuzzle || isAnimating) return false;
 
     try {
@@ -155,14 +156,31 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
             // Puzzle completed
             setPuzzleSolved(true);
             setPuzzleFailed(false);
-            const puzzleWithMeta = {
-              ...currentPuzzle,
-              popularity: 0,
-              nbPlays: 0,
-              gameUrl: '',
-              openingTags: []
-            };
-            dispatch(updateRatings({ success: true, userId: user?.id || '', puzzle: puzzleWithMeta }));
+            const result = await dispatch(updateRatingsAfterPuzzleAsync({ success: true, userId: user?.id })).unwrap();
+            
+            // Save to Supabase if we have a logged-in user
+            if (result && user?.id && !user.id.startsWith('guest_')) {
+              try {
+                const { error } = await supabase
+                  .from('user_ratings')
+                  .upsert({
+                    user_id: user.id,
+                    ratings: result.userRatings,
+                    updated_at: new Date().toISOString()
+                  }, {
+                    onConflict: 'user_id'
+                  });
+
+                if (error) {
+                  console.error('❌ Error saving ratings to Supabase:', error);
+                } else {
+                  console.log('✅ Successfully saved ratings to Supabase');
+                }
+              } catch (err) {
+                console.error('❌ Error saving to Supabase:', err);
+              }
+            }
+            
             onPuzzleComplete?.(true);
           } else {
             // Make opponent's next move
@@ -191,14 +209,31 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           // Incorrect move
           setPuzzleSolved(false);
           setPuzzleFailed(true);
-          const puzzleWithMeta = {
-            ...currentPuzzle,
-            popularity: 0,
-            nbPlays: 0,
-            gameUrl: '',
-            openingTags: []
-          };
-          dispatch(updateRatings({ success: false, userId: user?.id || '', puzzle: puzzleWithMeta }));
+          const result = await dispatch(updateRatingsAfterPuzzleAsync({ success: false, userId: user?.id })).unwrap();
+          
+          // Save to Supabase if we have a logged-in user
+          if (result && user?.id && !user.id.startsWith('guest_')) {
+            try {
+              const { error } = await supabase
+                .from('user_ratings')
+                .upsert({
+                  user_id: user.id,
+                  ratings: result.userRatings,
+                  updated_at: new Date().toISOString()
+                }, {
+                  onConflict: 'user_id'
+                });
+
+              if (error) {
+                console.error('❌ Error saving ratings to Supabase:', error);
+              } else {
+                console.log('✅ Successfully saved ratings to Supabase');
+              }
+            } catch (err) {
+              console.error('❌ Error saving to Supabase:', err);
+            }
+          }
+          
           onPuzzleComplete?.(false);
         }
       }
@@ -266,7 +301,16 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
 
   // Keep drag-and-drop functionality as fallback
   const onDrop = (sourceSquare: string, targetSquare: string) => {
-    return makeMove(sourceSquare as Square, targetSquare as Square);
+    makeMove(sourceSquare as Square, targetSquare as Square)
+      .then(result => {
+        if (!result) {
+          // Handle invalid move if needed
+        }
+      })
+      .catch(error => {
+        console.error('Error in onDrop:', error);
+      });
+    return true; // Always return true to prevent the piece from snapping back
   };
 
   return (

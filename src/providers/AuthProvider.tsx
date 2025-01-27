@@ -249,37 +249,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Event:', event);
       console.log('Session:', session ? 'User logged in' : 'User logged out');
 
-      if (!mounted || !authStateChangeEnabled.current) {
+      // Skip if we're still initializing or if this is just a token refresh
+      if (!authStateChangeEnabled.current || event === 'TOKEN_REFRESHED') {
         console.log('⚠️ Skipping auth state change - component unmounted or initialization incomplete');
         return;
       }
 
       dispatch(setLoading(true));
-
       try {
         if (event === 'SIGNED_OUT') {
           console.log('🚪 User signed out, transitioning to guest mode');
           ratingsLoaded.current = false; // Reset ratings loaded flag
           dispatch(setCurrentPuzzle(null)); // Clear current puzzle
           await setupGuestSession();
-        } else if (session) {
+        } else if (session?.user && session.user.id !== lastUserId.current) {
           console.log('👤 Setting user on auth change:', session.user.id);
           dispatch(setUser(session.user));
-          dispatch(setCurrentPuzzle(null)); // Clear current puzzle
           await loadRatings(session);
-        } else {
-          console.log('🔄 Loading guest session on auth change');
-          ratingsLoaded.current = false; // Reset ratings loaded flag
-          dispatch(setCurrentPuzzle(null)); // Clear current puzzle
-          await loadRatings(null);
         }
       } catch (error) {
         console.error('❌ Auth state change error:', error);
         dispatch(setError(error instanceof Error ? error.message : 'Unknown error'));
       } finally {
-        if (mounted) {
-          dispatch(setLoading(false));
-        }
+        dispatch(setLoading(false));
       }
     });
 

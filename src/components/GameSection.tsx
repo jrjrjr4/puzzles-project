@@ -165,13 +165,19 @@ export default function GameSection() {
           
           if (loadedPuzzle) {
             console.log('✨ [Initialize] Successfully loaded saved puzzle:', loadedPuzzle.id);
+            setIsLoading(false);
+            isInitializing.current = false;
             return;
           }
         }
         
         // Only load a new puzzle if we didn't get one from storage
-        console.log('🎯 [Initialize] No saved puzzle found, getting new one');
-        await loadNextPuzzle();
+        if (!currentPuzzle) {
+          console.log('🎯 [Initialize] No saved puzzle found, getting new one');
+          await loadNextPuzzle();
+        } else {
+          console.log('✨ [Initialize] Using existing puzzle:', currentPuzzle.id);
+        }
       } catch (error) {
         console.error('❌ [Initialize] Error:', error);
         if (mounted) {
