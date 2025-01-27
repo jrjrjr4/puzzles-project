@@ -14,18 +14,37 @@ interface GuestSession {
   guestId: string;
   ratings: {
     overall: { rating: number; ratingDeviation: number };
-    categories: Record<string, { rating: number; ratingDeviation: number }>;
+    categories: Record<string, { 
+      rating: number; 
+      ratingDeviation: number;
+      attempts: number;
+    }>;
   };
   lastPuzzleState: any;
   solvedPuzzles: string[];
 }
 
 const createGuestSession = (): GuestSession => {
+  // Create default ratings for all categories
+  const defaultRating = { rating: 1600, ratingDeviation: 350, attempts: 0 };
+  const defaultCategories: Record<string, typeof defaultRating> = {
+    'Mate': { ...defaultRating },
+    'Fork': { ...defaultRating },
+    'Pin': { ...defaultRating },
+    'Defense': { ...defaultRating },
+    'Endgame': { ...defaultRating },
+    'Deflection': { ...defaultRating },
+    'Quiet Move': { ...defaultRating },
+    'Kingside Attack': { ...defaultRating },
+    'Discovered Attack': { ...defaultRating },
+    'Capturing Defender': { ...defaultRating }
+  };
+
   return {
     guestId: `guest_${Math.random().toString(36).substring(2, 15)}`,
     ratings: {
       overall: { rating: 1600, ratingDeviation: 350 },
-      categories: {}
+      categories: defaultCategories
     },
     lastPuzzleState: null,
     solvedPuzzles: []
