@@ -435,15 +435,24 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
   console.log('Fetching last puzzle for user:', userId);
 
   try {
-    // Check if this is a guest user by userId prefix
-    const isGuest = userId.startsWith('guest_');
+    // Check if this is a guest user by userId prefix or specific ID
+    const isGuest = userId?.startsWith('guest_') || userId === '558bb524-a3ba-4ecc-9a8a-158c13c5cb58';
 
     if (isGuest) {
       // Try to load from guest-specific localStorage first
       const savedPuzzle = localStorage.getItem(`guest_last_puzzle_${userId}`);
+      const guestSession = localStorage.getItem('guestSession');
+      let puzzle = null;
+
       if (savedPuzzle) {
-        const puzzle = JSON.parse(savedPuzzle);
-        console.log('✅ Loaded last puzzle from guest localStorage:', puzzle);
+        puzzle = JSON.parse(savedPuzzle);
+      } else if (guestSession) {
+        const session = JSON.parse(guestSession);
+        puzzle = session.lastPuzzleState;
+      }
+
+      if (puzzle) {
+        console.log('✅ Loaded last puzzle from guest storage:', puzzle);
         dispatch(setCurrentPuzzle(puzzle));
         return;
       } else {

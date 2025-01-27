@@ -6,7 +6,7 @@ import PuzzleInfo from './PuzzleInfo';
 import { parsePuzzleCsv } from '../utils/puzzles';
 import { setCurrentPuzzle, loadLastPuzzle, saveCurrentPuzzle, fetchLastPuzzle, updateRatingsAfterPuzzleAsync } from '../store/slices/puzzleSlice';
 import { getNextPuzzle } from '../utils/puzzleSelector';
-import { RootState, AppDispatch } from '../store/store';
+import { RootState, AppDispatch, store } from '../store/store';
 import { Puzzle } from '../types/puzzle';
 
 export default function GameSection() {
@@ -151,11 +151,27 @@ export default function GameSection() {
           lastUserId.current = user?.id || null;
         }
         
-        // For guest users or no user, load a new puzzle if none exists
-        if (!currentPuzzle) {
-          console.log('🎯 [Initialize] No current puzzle, loading new one');
-          await loadNextPuzzle();
+        // Try to load the last puzzle first
+        if (user?.id) {
+          console.log('📖 [Initialize] Attempting to load last puzzle');
+          await dispatch(fetchLastPuzzle(user.id));
+          
+          // Wait a moment for state to update
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Check if we got a puzzle from storage
+          const state = store.getState();
+          const loadedPuzzle = state.puzzle.currentPuzzle;
+          
+          if (loadedPuzzle) {
+            console.log('✨ [Initialize] Successfully loaded saved puzzle:', loadedPuzzle.id);
+            return;
+          }
         }
+        
+        // Only load a new puzzle if we didn't get one from storage
+        console.log('🎯 [Initialize] No saved puzzle found, getting new one');
+        await loadNextPuzzle();
       } catch (error) {
         console.error('❌ [Initialize] Error:', error);
         if (mounted) {
@@ -171,7 +187,7 @@ export default function GameSection() {
     }
 
     // Start initialization immediately if needed
-    if (!currentPuzzle || user?.id !== lastUserId.current) {
+    if ((!currentPuzzle || user?.id !== lastUserId.current) && !isInitializing.current) {
       initializePuzzle();
     }
 
