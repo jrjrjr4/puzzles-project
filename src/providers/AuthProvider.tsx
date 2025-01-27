@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializationAttempts = useRef(0);
   const maxInitAttempts = 3;
   const authStateChangeEnabled = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
   const setupGuestSession = async () => {
     console.log('🔄 Setting up guest session');
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsedSession: GuestSession = JSON.parse(guestSession);
         dispatch(loadUserRatings({ ratings: parsedSession.ratings }));
         
-        dispatch(setUser({
+        const guestUser = {
           id: parsedSession.guestId,
           email: undefined,
           user_metadata: { is_guest: true },
@@ -85,8 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
           role: 'authenticated',
           updated_at: new Date().toISOString()
-        }));
+        };
         
+        dispatch(setUser(guestUser));
+        lastUserId.current = guestUser.id;
         ratingsLoaded.current = true;
         console.log('✅ Guest session loaded successfully');
 
@@ -105,14 +108,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadRatings = async (session: Session | null) => {
     console.log('📊 loadRatings called with session:', session?.user?.id);
     
-    if (ratingsLoaded.current) {
+    // Force reload if switching between guest and authenticated user
+    const isGuest = !session?.user || session.user.user_metadata?.is_guest;
+    const wasGuest = !lastUserId.current || lastUserId.current.startsWith('guest_');
+    const userChanged = session?.user?.id !== lastUserId.current;
+    
+    if (ratingsLoaded.current && !userChanged && isGuest === wasGuest) {
       console.log('⏭️ Ratings already loaded, skipping');
       return;
     }
 
     try {
       if (session?.user) {
-        const isGuest = session.user.user_metadata?.is_guest;
         console.log('👤 Loading ratings for user:', session.user.id, isGuest ? '(guest)' : '');
         
         if (isGuest) {
@@ -123,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.log('📝 Found saved guest session:', guestSession);
               dispatch(loadUserRatings({ ratings: guestSession.ratings }));
               ratingsLoaded.current = true;
+              lastUserId.current = session.user.id;
               
               // Clear current puzzle to trigger auto-load
               dispatch(setCurrentPuzzle(null));
@@ -136,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🔄 Fetching ratings from Supabase for user:', session.user.id);
         await dispatch(fetchUserRatings(session.user.id));
         ratingsLoaded.current = true;
+        lastUserId.current = session.user.id;
         
         // Clear current puzzle to trigger auto-load
         dispatch(setCurrentPuzzle(null));
