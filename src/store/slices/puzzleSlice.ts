@@ -60,276 +60,180 @@ const puzzleSlice = createSlice({
   name: 'puzzle',
   initialState,
   reducers: {
-    setCurrentPuzzle: (state, action) => {
-      console.group('🧩 [PuzzleSlice] Setting Current Puzzle');
-      console.time('puzzleStateUpdate');
+    setCurrentPuzzle: (state, action: PayloadAction<PuzzleState['currentPuzzle']>) => {
+      const start = performance.now();
       
-      if (!action.payload) {
-        console.warn('⚠️ Attempted to set null puzzle');
-        state.currentPuzzle = null;
-        console.timeEnd('puzzleStateUpdate');
-        console.groupEnd();
+      // Skip state update if we're setting null puzzle during initialization
+      if (!action.payload && !state.currentPuzzle) {
+        console.log('🔄 Skipping null puzzle update during initialization');
         return;
       }
-      
-      try {
-        const oldPuzzleId = state.currentPuzzle?.id;
-        state.previousPuzzleId = oldPuzzleId || null;
-        
-        // If we have rating updates, store the themes that were updated
-        if (state.lastRatingUpdates) {
-          state.lastUpdatedThemes = Object.keys(state.lastRatingUpdates.categories);
-        } else {
-          // Clear lastUpdatedThemes when transitioning to a new puzzle without updates
-          state.lastUpdatedThemes = [];
-        }
-        
-        state.currentPuzzle = {
-          ...action.payload,
-          themes: action.payload.themes || ['Tactics'],
-          rating: Number(action.payload.rating) || 1200,
-          ratingDeviation: Number(action.payload.ratingDeviation) || BASE_RD,
-        };
-        
-        if (state.currentPuzzle) {
-          console.log('State transition:', {
-            from: oldPuzzleId,
-            to: state.currentPuzzle.id,
-            themes: state.currentPuzzle.themes,
-            rating: state.currentPuzzle.rating
-          });
-        }
-        
-        state.lastRatingUpdates = null;
-        console.timeEnd('puzzleStateUpdate');
-      } catch (error) {
-        console.error('❌ Error setting current puzzle:', error);
-        state.currentPuzzle = null;
+
+      // Only log warning if we're explicitly setting null when we had a puzzle
+      if (!action.payload && state.currentPuzzle) {
+        console.warn('⚠️ Setting null puzzle when we had a puzzle');
       }
-      console.groupEnd();
+
+      console.log('🧩 [PuzzleSlice] Setting Current Puzzle');
+      if (action.payload) {
+        console.log('State transition:', {
+          from: state.currentPuzzle?.id,
+          to: action.payload.id,
+          themes: action.payload.themes,
+          rating: action.payload.rating
+        });
+      }
+
+      state.currentPuzzle = action.payload;
+      const end = performance.now();
+      console.log('puzzleStateUpdate:', end - start, 'ms');
     },
     loadLastPuzzle: (state) => {
       // This is now just a placeholder - actual loading happens in the thunk
       console.log('Loading last puzzle from state');
     },
     updateRatings: (state, action: PayloadAction<{
-      success: boolean;
       userId: string;
-      puzzle: Puzzle;
+      currentPuzzle: PuzzleState['currentPuzzle'];
+      score: number;
     }>) => {
-      console.log('🎯 Updating Ratings After Puzzle');
-      console.log('Success:', action.payload.success);
-      console.log('User ID:', action.payload.userId);
+      const { userId, currentPuzzle, score } = action.payload;
+      if (!currentPuzzle || !state.userRatings || !state.userRatings.overall) return;
+
+      // Check if this is a guest user
+      const isGuest = userId.startsWith('guest_');
+
+      // Calculate rating changes
+      const userRatings = {
+        ...state.userRatings,
+        overall: state.userRatings.overall // TypeScript now knows this is non-null
+      };
       
-      if (!state.userRatings.loaded || !state.userRatings.overall) {
+      const categoriesToUpdate = currentPuzzle.themes.length > 0 
+        ? currentPuzzle.themes 
+        : ['Tactics'];
+
+      const updates: PuzzleState['lastRatingUpdates'] = {
+        overall: calculateRatingChange(
+          userRatings.overall.rating,
+          userRatings.overall.ratingDeviation,
+          currentPuzzle.rating,
+          currentPuzzle.ratingDeviation,
+          score,
+          userRatings.overall.attempts || 0
+        ),
+        categories: {}
+      };
+
+      console.log('Overall rating update:', {
+        old: userRatings.overall.rating,
+        new: updates.overall.newRating,
+        change: updates.overall.newRating - userRatings.overall.rating,
+        attempts: updates.overall.attempts
+      });
+
+      // Update category ratings
+      categoriesToUpdate.forEach(category => {
+        if (!category) return;
+        
+        console.log(`Processing category: ${category}`);
+        
+        const categoryRating = userRatings.categories[category] || {
+          rating: 1600,
+          ratingDeviation: BASE_RD,
+          attempts: 0
+        };
+
+        const update = calculateRatingChange(
+          categoryRating.rating,
+          categoryRating.ratingDeviation,
+          currentPuzzle.rating,
+          currentPuzzle.ratingDeviation,
+          score,
+          categoryRating.attempts
+        );
+
+        console.log(`Category ${category} rating update:`, {
+          old: categoryRating.rating,
+          new: update.newRating,
+          change: update.newRating - categoryRating.rating,
+          attempts: update.attempts
+        });
+
+        updates.categories[category] = update;
+      });
+
+      // Update state with new ratings
+      if (state.userRatings.overall) {
+        state.userRatings.overall = {
+          rating: updates.overall.newRating,
+          ratingDeviation: updates.overall.newRD,
+          attempts: (state.userRatings.overall.attempts || 0) + 1
+        };
+      }
+
+      Object.entries(updates.categories).forEach(([category, update]) => {
+        state.userRatings.categories[category] = {
+          rating: update.newRating,
+          ratingDeviation: update.newRD,
+          attempts: (state.userRatings.categories[category]?.attempts || 0) + 1
+        };
+      });
+
+      state.lastRatingUpdates = updates;
+
+      // Save to localStorage for all users as backup
+      try {
+        localStorage.setItem('chess_puzzle_ratings', JSON.stringify(state.userRatings));
+        console.log('💾 Successfully saved to localStorage');
+      } catch (err) {
+        console.error('❌ Failed to save to localStorage:', err);
+      }
+
+      // For guest users, update the guest session
+      if (isGuest) {
+        try {
+          const guestSession = localStorage.getItem('guestSession');
+          if (guestSession) {
+            const session = JSON.parse(guestSession);
+            session.ratings = state.userRatings;
+            session.solvedPuzzles = [...(session.solvedPuzzles || []), currentPuzzle.id];
+            session.lastPuzzleState = currentPuzzle;
+            localStorage.setItem('guestSession', JSON.stringify(session));
+            console.log('💾 Successfully saved guest session to localStorage');
+          }
+        } catch (err) {
+          console.error('❌ Failed to save guest session:', err);
+        }
         return;
       }
 
-      // Clear any previous theme updates since we have new ones
-      state.lastUpdatedThemes = [];
-      
-      try {
-        const { success, puzzle } = action.payload;
-        console.log('Puzzle details:', puzzle);
+      // For logged-in users, save to Supabase
+      if (userId && !isGuest) {
+        console.log('🔄 Saving to Supabase for user:', userId);
         
-        const score = success ? 1 : 0;
-        console.log('Puzzle details:', {
-          id: puzzle.id,
-          rating: puzzle.rating,
-          themes: puzzle.themes
-        });
-        
-        const categoriesToUpdate = puzzle.themes.length > 0 
-          ? puzzle.themes 
-          : ['Tactics'];
-        
-        // Update overall rating
-        const overallUpdate = calculateRatingChange(
-          state.userRatings.overall.rating,
-          state.userRatings.overall.ratingDeviation,
-          puzzle.rating,
-          puzzle.ratingDeviation,
-          score,
-          state.userRatings.overall.attempts
-        );
-        
-        const ratingChange = overallUpdate.newRating - state.userRatings.overall.rating;
-        
-        console.log('Overall rating update:', {
-          old: state.userRatings.overall.rating,
-          new: overallUpdate.newRating,
-          change: ratingChange,
-          attempts: state.userRatings.overall.attempts + 1
-        });
-        
-        state.lastRatingUpdates = {
-          overall: {
-            oldRating: state.userRatings.overall.rating,
-            newRating: overallUpdate.newRating,
-            oldRD: state.userRatings.overall.ratingDeviation,
-            newRD: overallUpdate.newRD,
-            change: ratingChange,
-            attempts: state.userRatings.overall.attempts + 1
-          },
-          categories: {}
-        };
-        
-        // Update overall rating with attempts
-        state.userRatings.overall = {
-          rating: overallUpdate.newRating,
-          ratingDeviation: overallUpdate.newRD,
-          attempts: state.userRatings.overall.attempts + 1
-        };
+        // Create a Promise to handle the async operation
+        const saveRatings = async () => {
+          try {
+            const { error } = await supabase
+              .from('user_ratings')
+              .upsert({
+                user_id: userId,
+                ratings: state.userRatings,
+                updated_at: new Date().toISOString()
+              });
 
-        // Process each category
-        categoriesToUpdate.forEach(category => {
-          if (!state.userRatings.categories[category]) {
-            state.userRatings.categories[category] = {
-              rating: state.userRatings.overall!.rating,
-              ratingDeviation: BASE_RD,
-              attempts: 0
-            };
-          }
-
-          const categoryRating = state.userRatings.categories[category];
-          const update = calculateRatingChange(
-            categoryRating.rating,
-            categoryRating.ratingDeviation,
-            puzzle.rating,
-            puzzle.ratingDeviation,
-            score,
-            categoryRating.attempts
-          );
-
-          const categoryChange = update.newRating - categoryRating.rating;
-
-          console.log(`Processing category: ${category}`);
-          console.log(`Category ${category} rating update:`, {
-            old: categoryRating.rating,
-            new: update.newRating,
-            change: categoryChange,
-            attempts: categoryRating.attempts + 1
-          });
-
-          state.userRatings.categories[category] = {
-            rating: update.newRating,
-            ratingDeviation: update.newRD,
-            attempts: categoryRating.attempts + 1
-          };
-
-          if (state.lastRatingUpdates) {
-            state.lastRatingUpdates.categories[category] = {
-              oldRating: categoryRating.rating,
-              newRating: update.newRating,
-              oldRD: categoryRating.ratingDeviation,
-              newRD: update.newRD,
-              change: categoryChange,
-              attempts: categoryRating.attempts + 1
-            };
-          }
-        });
-
-        // Create a deep copy of the ratings for saving
-        const ratingsToSave = JSON.parse(JSON.stringify(state.userRatings));
-
-        // Save to localStorage
-        try {
-          // Save to general localStorage for anonymous users
-          localStorage.setItem('chess_puzzle_ratings', JSON.stringify(ratingsToSave));
-          console.log('💾 Successfully saved to localStorage');
-          
-          // If this is a guest user, also save to their specific storage
-          if (action.payload.userId) {
-            // Check if guest and save to specific storage
-            const saveGuestRatings = async () => {
-              const user = await supabase.auth.getUser();
-              if (user.data.user?.user_metadata?.is_guest) {
-                localStorage.setItem(`guest_ratings_${action.payload.userId}`, JSON.stringify(ratingsToSave));
-                console.log('💾 Successfully saved guest ratings to localStorage');
-              }
-            };
-            saveGuestRatings();
-          }
-        } catch (err) {
-          console.error('❌ Failed to save to localStorage:', err);
-        }
-
-        // If user is logged in, save to Supabase
-        if (action.payload.userId) {
-          console.log('🔄 Saving to Supabase for user:', action.payload.userId);
-          
-          // Create a Promise to handle the async operation
-          const saveRatings = async () => {
-            try {
-              // Check if a record exists first
-              const { data: existingData, error: checkError } = await supabase
-                .from('user_ratings')
-                .select('id')
-                .eq('user_id', action.payload.userId)
-                .single();
-
-              if (checkError && checkError.code !== 'PGRST116') {
-                console.error('❌ Error checking existing record:', checkError);
-                return;
-              }
-
-              if (existingData) {
-                // Update existing record
-                console.log('Updating existing record');
-                const { error: updateError } = await supabase
-                  .from('user_ratings')
-                  .update({
-                    ratings: ratingsToSave,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('user_id', action.payload.userId);
-
-                if (updateError) {
-                  console.error('❌ Error updating ratings:', updateError);
-                } else {
-                  console.log('✅ Successfully updated ratings in Supabase');
-                }
-              } else {
-                // Insert new record
-                console.log('Creating new record');
-                const { error: insertError } = await supabase
-                  .from('user_ratings')
-                  .insert({
-                    user_id: action.payload.userId,
-                    ratings: ratingsToSave,
-                    updated_at: new Date().toISOString()
-                  });
-
-                if (insertError) {
-                  console.error('❌ Error inserting ratings:', insertError);
-                } else {
-                  console.log('✅ Successfully inserted ratings in Supabase');
-                }
-              }
-
-              // Verify the save
-              const { data: verifyData, error: verifyError } = await supabase
-                .from('user_ratings')
-                .select('ratings')
-                .eq('user_id', action.payload.userId)
-                .single();
-
-              if (verifyError) {
-                console.error('❌ Error verifying save:', verifyError);
-              } else {
-                console.log('✅ Verified saved ratings:', verifyData.ratings);
-              }
-            } catch (err) {
-              console.error('❌ Error in saveRatings:', err);
+            if (error) {
+              console.error('❌ Error saving ratings:', error);
+            } else {
+              console.log('✅ Successfully saved ratings to Supabase');
             }
-          };
+          } catch (err) {
+            console.error('❌ Error in saveRatings:', err);
+          }
+        };
 
-          // Execute the save operation
-          saveRatings();
-        }
-
-      } catch (error) {
-        console.error('❌ Error updating ratings:', error);
+        saveRatings();
       }
     },
     loadUserRatings: (state, action: PayloadAction<{ ratings: any }>) => {
@@ -376,105 +280,40 @@ const puzzleSlice = createSlice({
 export const { setCurrentPuzzle, updateRatings, loadUserRatings, loadLastPuzzle } = puzzleSlice.actions;
 export default puzzleSlice.reducer;
 
-// Add async thunk to load ratings
-export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
-  console.group('🔄 Fetching User Ratings');
-  console.log('Fetching ratings for user:', userId);
-  
-  try {
-    // First, check if the table exists by trying to get the count
-    const { error: tableCheckError } = await supabase
-      .from('user_ratings')
-      .select('id', { count: 'exact', head: true });
-
-    if (tableCheckError) {
-      console.error('❌ Table check error:', {
-        message: tableCheckError.message,
-        details: tableCheckError.details,
-        hint: tableCheckError.hint
-      });
-      return;
-    }
-
-    // Then try to fetch the user's ratings
-    const { data, error } = await supabase
-      .from('user_ratings')
-      .select('ratings')
-      .eq('user_id', userId)
-      .single();
-
-    if (error) {
-      console.error('❌ Error fetching user ratings:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      
-      // If no record exists, create one with default ratings
-      if (error.code === 'PGRST116') {
-        console.log('Creating initial ratings record for user');
-        
-        // Create default ratings for all categories
-        const initialRatings = {
-          overall: {
-            rating: 1600,
-            ratingDeviation: BASE_RD,
-            attempts: 0
-          },
-          categories: {}
-        };
-        
-        const { error: insertError } = await supabase
-          .from('user_ratings')
-          .insert({
-            user_id: userId,
-            ratings: initialRatings,
-            updated_at: new Date().toISOString()
-          });
-
-        if (insertError) {
-          console.error('❌ Error creating initial ratings:', insertError);
-        } else {
-          console.log('✅ Created initial ratings');
-          dispatch(loadUserRatings({ ratings: initialRatings }));
-        }
-      }
-      return;
-    }
-
-    if (data?.ratings) {
-      console.log('✅ Successfully loaded ratings from Supabase:', data.ratings);
-      dispatch(loadUserRatings({ ratings: data.ratings }));
-    } else {
-      console.log('ℹ️ No existing ratings found for user');
-    }
-  } catch (err) {
-    console.error('❌ Error in fetchUserRatings:', err);
-  } finally {
-    console.groupEnd();
-  }
-};
-
 // Add async thunk to save current puzzle
 export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPuzzle']) => async () => {
-  if (!puzzle) return;
+  if (!puzzle) {
+    console.log('No puzzle to save');
+    return;
+  }
 
   console.log('Saving current puzzle:', puzzle.id, 'for user:', userId);
 
-  try {
-    // Check if this is a guest user
-    const { data: { user } } = await supabase.auth.getUser();
-    const isGuest = user?.user_metadata?.is_guest;
+  // Check if this is a guest user by userId prefix
+  const isGuest = userId?.startsWith('guest_') || userId === '558bb524-a3ba-4ecc-9a8a-158c13c5cb58';
 
-    if (isGuest) {
+  if (isGuest) {
+    try {
       // Save to guest-specific localStorage
       localStorage.setItem(`guest_last_puzzle_${userId}`, JSON.stringify(puzzle));
       console.log('💾 Saved last puzzle to guest localStorage');
-      return;
+      
+      // Also update the guest session
+      const guestSession = localStorage.getItem('guestSession');
+      if (guestSession) {
+        const session = JSON.parse(guestSession);
+        session.lastPuzzleState = puzzle;
+        localStorage.setItem('guestSession', JSON.stringify(session));
+        console.log('💾 Updated guest session with last puzzle');
+      }
+    } catch (err) {
+      console.error('❌ Failed to save guest puzzle to localStorage:', err);
     }
+    return; // Early return for guest users
+  }
 
-    // First check if record exists
+  // Only proceed with Supabase operations for non-guest users
+  try {
     const { data: existingRecord } = await supabase
       .from('user_progress')
       .select('user_id')
@@ -514,27 +353,107 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
   }
 };
 
+// Add async thunk to fetch user ratings
+export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
+  console.group('🔄 Fetching User Ratings');
+  console.log('Fetching ratings for user:', userId);
+  
+  // Check if this is a guest user by userId prefix - no need to check Supabase
+  const isGuest = userId.startsWith('guest_');
+
+  if (isGuest) {
+    // For guest users, load from localStorage
+    try {
+      const guestSession = localStorage.getItem('guestSession');
+      if (guestSession) {
+        const session = JSON.parse(guestSession);
+        console.log('✅ Loaded guest ratings from localStorage:', session.ratings);
+        dispatch(loadUserRatings({ ratings: session.ratings }));
+      } else {
+        // Create default ratings for guest
+        const defaultRating = { rating: 1600, ratingDeviation: 350, attempts: 0 };
+        const defaultCategories = {
+          'Mate': { ...defaultRating },
+          'Fork': { ...defaultRating },
+          'Pin': { ...defaultRating },
+          'Defense': { ...defaultRating },
+          'Endgame': { ...defaultRating },
+          'Deflection': { ...defaultRating },
+          'Quiet Move': { ...defaultRating },
+          'Kingside Attack': { ...defaultRating },
+          'Discovered Attack': { ...defaultRating },
+          'Capturing Defender': { ...defaultRating }
+        };
+        
+        const defaultRatings = {
+          overall: { rating: 1600, ratingDeviation: 350 },
+          categories: defaultCategories
+        };
+        
+        dispatch(loadUserRatings({ ratings: defaultRatings }));
+      }
+    } catch (err) {
+      console.error('❌ Error loading guest ratings:', err);
+    }
+    console.groupEnd();
+    return;
+  }
+
+  // Only proceed with Supabase operations for non-guest users
+  try {
+    const { data, error } = await supabase
+      .from('user_ratings')
+      .select('ratings')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error fetching user ratings:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      return;
+    }
+
+    if (data?.ratings) {
+      console.log('✅ Successfully loaded ratings from Supabase:', data.ratings);
+      dispatch(loadUserRatings({ ratings: data.ratings }));
+    } else {
+      console.log('ℹ️ No existing ratings found for user');
+    }
+  } catch (err) {
+    console.error('❌ Error in fetchUserRatings:', err);
+  } finally {
+    console.groupEnd();
+  }
+};
+
 // Add async thunk to fetch last puzzle
 export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
   console.log('Fetching last puzzle for user:', userId);
 
   try {
-    // Check if this is a guest user
-    const { data: { user } } = await supabase.auth.getUser();
-    const isGuest = user?.user_metadata?.is_guest;
+    // Check if this is a guest user by userId prefix
+    const isGuest = userId.startsWith('guest_');
 
     if (isGuest) {
       // Try to load from guest-specific localStorage first
       const savedPuzzle = localStorage.getItem(`guest_last_puzzle_${userId}`);
       if (savedPuzzle) {
         const puzzle = JSON.parse(savedPuzzle);
-        console.log('📖 Loaded last puzzle from guest localStorage:', puzzle);
+        console.log('✅ Loaded last puzzle from guest localStorage:', puzzle);
         dispatch(setCurrentPuzzle(puzzle));
+        return;
+      } else {
+        console.log('No saved puzzle found for guest user');
+        dispatch(setCurrentPuzzle(null));
         return;
       }
     }
 
-    // If not a guest or no saved puzzle, fetch from Supabase
+    // If not a guest, fetch from Supabase
     const { data, error } = await supabase
       .from('user_progress')
       .select('last_puzzle')
@@ -543,6 +462,7 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
 
     if (error) {
       console.error('❌ Error fetching last puzzle:', error);
+      dispatch(setCurrentPuzzle(null));
       return;
     }
 
@@ -555,6 +475,7 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
     }
   } catch (error) {
     console.error('❌ Error in fetchLastPuzzle:', error);
+    dispatch(setCurrentPuzzle(null));
   }
 };
 
@@ -564,7 +485,7 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
     const state = getState() as RootState;
     const currentPuzzle = state.puzzle.currentPuzzle;
     const userRatings = state.puzzle.userRatings;
-    const isGuest = state.auth.user?.user_metadata?.is_guest;
+    const isGuest = userId?.startsWith('guest_');
 
     if (!currentPuzzle || !userRatings.overall) {
       console.warn('⚠️ No current puzzle or ratings not loaded, skipping rating update');
@@ -635,42 +556,11 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
 
       // If this is a guest user, update the guest session in localStorage
       if (isGuest) {
-        const guestSession = localStorage.getItem('guestSession');
-        if (guestSession) {
-          const session = JSON.parse(guestSession);
-          session.ratings = {
-            overall: {
-              rating: updates.overall.newRating,
-              ratingDeviation: updates.overall.newRD,
-              attempts: updates.overall.attempts
-            },
-            categories: Object.fromEntries(
-              Object.entries(updates.categories).map(([category, update]) => [
-                category,
-                {
-                  rating: update.newRating,
-                  ratingDeviation: update.newRD,
-                  attempts: update.attempts
-                }
-              ])
-            )
-          };
-          session.solvedPuzzles = [...(session.solvedPuzzles || []), currentPuzzle.id];
-          session.lastPuzzleState = currentPuzzle;
-          localStorage.setItem('guestSession', JSON.stringify(session));
-          console.log('💾 Successfully saved guest session to localStorage');
-        }
-      }
-      // If user is logged in, save to Supabase
-      else if (userId) {
-        console.log('🔄 Saving to Supabase for user:', userId);
-        
-        // Create a Promise to handle the async operation
-        const { error } = await supabase
-          .from('user_ratings')
-          .upsert({
-            user_id: userId,
-            ratings: {
+        try {
+          const guestSession = localStorage.getItem('guestSession');
+          if (guestSession) {
+            const session = JSON.parse(guestSession);
+            session.ratings = {
               overall: {
                 rating: updates.overall.newRating,
                 ratingDeviation: updates.overall.newRD,
@@ -686,14 +576,54 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
                   }
                 ])
               )
-            },
-            updated_at: new Date().toISOString()
-          });
+            };
+            session.solvedPuzzles = [...(session.solvedPuzzles || []), currentPuzzle.id];
+            session.lastPuzzleState = currentPuzzle;
+            localStorage.setItem('guestSession', JSON.stringify(session));
+            console.log('💾 Successfully saved guest session to localStorage');
+          }
+        } catch (err) {
+          console.error('❌ Failed to save guest session:', err);
+        }
+        return updates;
+      }
 
-        if (error) {
-          console.error('❌ Error saving ratings to Supabase:', error);
-        } else {
-          console.log('✅ Successfully saved ratings to Supabase');
+      // For logged-in users, save to Supabase
+      if (userId && !isGuest) {
+        console.log('🔄 Saving to Supabase for user:', userId);
+        
+        try {
+          const { error } = await supabase
+            .from('user_ratings')
+            .upsert({
+              user_id: userId,
+              ratings: {
+                overall: {
+                  rating: updates.overall.newRating,
+                  ratingDeviation: updates.overall.newRD,
+                  attempts: updates.overall.attempts
+                },
+                categories: Object.fromEntries(
+                  Object.entries(updates.categories).map(([category, update]) => [
+                    category,
+                    {
+                      rating: update.newRating,
+                      ratingDeviation: update.newRD,
+                      attempts: update.attempts
+                    }
+                  ])
+                )
+              },
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('❌ Error saving ratings to Supabase:', error);
+          } else {
+            console.log('✅ Successfully saved ratings to Supabase');
+          }
+        } catch (err) {
+          console.error('❌ Error saving to Supabase:', err);
         }
       }
 
