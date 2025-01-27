@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { Chessboard as ReactChessboard } from 'react-chessboard';
 import { RootState, AppDispatch } from '../store/store';
 import { updateRatingsAfterPuzzle } from '../store/slices/puzzleSlice';
@@ -11,16 +11,41 @@ interface ChessboardProps {
 }
 
 interface CustomSquareStyles {
-  [square: string]: { backgroundColor: string };
+  [square: string]: {
+    backgroundColor?: string;
+    background?: string;
+  };
 }
 
 const HIGHLIGHT_COLOR = { backgroundColor: 'rgba(134, 239, 172, 0.4)' }; // Light green with transparency
+const SELECTED_COLOR = { 
+  backgroundColor: 'rgba(20, 85, 255, 0.5)' // Blue with transparency
+};
+
+// Create a radial gradient for the dot
+const LEGAL_MOVE_STYLE = {
+  background: `radial-gradient(circle at center, rgba(20, 85, 255, 0.3) 25%, transparent 26%)`
+};
+
+// Create corner indicators for captures using right triangles
+const CAPTURE_MOVE_STYLE = {
+  background: `
+    linear-gradient(to bottom right, rgba(20, 85, 255, 0.3) 50%, transparent 50%) 0 0,
+    linear-gradient(to bottom left, rgba(20, 85, 255, 0.3) 50%, transparent 50%) 100% 0,
+    linear-gradient(to top right, rgba(20, 85, 255, 0.3) 50%, transparent 50%) 0 100%,
+    linear-gradient(to top left, rgba(20, 85, 255, 0.3) 50%, transparent 50%) 100% 100%
+  `,
+  backgroundRepeat: 'no-repeat',
+  backgroundSize: '25% 25%'
+};
 
 export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
   const [highlightedSquares, setHighlightedSquares] = useState<CustomSquareStyles>({});
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const [legalMoves, setLegalMoves] = useState<CustomSquareStyles>({});
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(150);
   const [puzzleSolved, setPuzzleSolved] = useState(false);
@@ -47,6 +72,8 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           setPuzzleSolved(false);
           setPuzzleFailed(false);
           setHighlightedSquares({});
+          setSelectedSquare(null);
+          setLegalMoves({});
           
           // Set board orientation to match the side that needs to move after the first move
           setBoardOrientation(currentPuzzle.fen.split(' ')[1] === 'w' ? 'black' : 'white');
@@ -96,7 +123,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
     );
   }
 
-  const onDrop = (sourceSquare: string, targetSquare: string) => {
+  const makeMove = (sourceSquare: Square, targetSquare: Square) => {
     if (!currentPuzzle || isAnimating) return false;
 
     try {
@@ -107,6 +134,10 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
       });
 
       if (move === null) return false;
+
+      // Clear selection and legal moves
+      setSelectedSquare(null);
+      setLegalMoves({});
 
       // Highlight the move
       setHighlightedSquares({
@@ -165,15 +196,75 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
     }
   };
 
+  const onSquareClick = (square: Square) => {
+    // If a piece is already selected
+    if (selectedSquare) {
+      // If clicking the same square, deselect it
+      if (square === selectedSquare) {
+        setSelectedSquare(null);
+        setLegalMoves({});
+        return;
+      }
+      
+      // If clicking a legal move square, make the move
+      if (legalMoves[square]) {
+        makeMove(selectedSquare, square);
+        return;
+      }
+      
+      // If clicking a different piece of the same color
+      const piece = game.get(square);
+      if (piece && piece.color === game.turn()) {
+        // Select the new piece
+        setSelectedSquare(square);
+        // Calculate and show legal moves for the new piece
+        const moves = game.moves({ square, verbose: true });
+        const newLegalMoves: CustomSquareStyles = {
+          [square]: SELECTED_COLOR
+        };
+        moves.forEach(move => {
+          // Check if the move is a capture
+          const targetPiece = game.get(move.to);
+          newLegalMoves[move.to] = targetPiece ? CAPTURE_MOVE_STYLE : LEGAL_MOVE_STYLE;
+        });
+        setLegalMoves(newLegalMoves);
+        return;
+      }
+    }
+    
+    // If no piece is selected, try to select a piece
+    const piece = game.get(square);
+    if (piece && piece.color === game.turn()) {
+      setSelectedSquare(square);
+      // Calculate and show legal moves
+      const moves = game.moves({ square, verbose: true });
+      const newLegalMoves: CustomSquareStyles = {
+        [square]: SELECTED_COLOR
+      };
+      moves.forEach(move => {
+        // Check if the move is a capture
+        const targetPiece = game.get(move.to);
+        newLegalMoves[move.to] = targetPiece ? CAPTURE_MOVE_STYLE : LEGAL_MOVE_STYLE;
+      });
+      setLegalMoves(newLegalMoves);
+    }
+  };
+
+  // Keep drag-and-drop functionality as fallback
+  const onDrop = (sourceSquare: string, targetSquare: string) => {
+    return makeMove(sourceSquare as Square, targetSquare as Square);
+  };
+
   return (
     <div className="space-y-4">
       <div className="w-full aspect-square">
         <ReactChessboard
           position={game.fen()}
           onPieceDrop={onDrop}
+          onSquareClick={onSquareClick}
           boardWidth={size}
           boardOrientation={boardOrientation}
-          customSquareStyles={highlightedSquares}
+          customSquareStyles={{ ...highlightedSquares, ...legalMoves }}
           animationDuration={transitionDuration}
           customBoardStyle={{
             borderRadius: '8px',
