@@ -112,99 +112,122 @@ const puzzleSlice = createSlice({
       // This is now just a placeholder - actual loading happens in the thunk
       console.log('Loading last puzzle from state');
     },
-    updateRatingsAfterPuzzle: (state, action: PayloadAction<{ success: boolean; userId?: string }>) => {
-      console.group('🎯 Updating Ratings After Puzzle');
+    updateRatings: (state, action: PayloadAction<{
+      success: boolean;
+      userId: string;
+      puzzle: Puzzle;
+    }>) => {
+      console.log('🎯 Updating Ratings After Puzzle');
       console.log('Success:', action.payload.success);
-      console.log('User ID:', action.payload.userId || 'anonymous');
+      console.log('User ID:', action.payload.userId);
       
-      if (!state.currentPuzzle || !state.userRatings.overall) {
-        console.warn('⚠️ No current puzzle or ratings not loaded, skipping rating update');
-        console.groupEnd();
+      if (!state.userRatings.loaded || !state.userRatings.overall) {
         return;
       }
 
+      // Clear any previous theme updates since we have new ones
+      state.lastUpdatedThemes = [];
+      
       try {
-        const score = action.payload.success ? 1 : 0;
+        const { success, puzzle } = action.payload;
+        console.log('Puzzle details:', puzzle);
+        
+        const score = success ? 1 : 0;
         console.log('Puzzle details:', {
-          id: state.currentPuzzle.id,
-          rating: state.currentPuzzle.rating,
-          themes: state.currentPuzzle.themes
+          id: puzzle.id,
+          rating: puzzle.rating,
+          themes: puzzle.themes
         });
         
-        const categoriesToUpdate = state.currentPuzzle.themes.length > 0 
-          ? state.currentPuzzle.themes 
+        const categoriesToUpdate = puzzle.themes.length > 0 
+          ? puzzle.themes 
           : ['Tactics'];
-
-        // Initialize overall rating with attempts if not present
-        if (!state.userRatings.overall.attempts) {
-          state.userRatings.overall.attempts = 0;
-        }
-
-        const updates: PuzzleState['lastRatingUpdates'] = {
-          overall: calculateRatingChange(
-            state.userRatings.overall.rating,
-            state.userRatings.overall.ratingDeviation,
-            state.currentPuzzle.rating,
-            state.currentPuzzle.ratingDeviation,
-            score,
-            state.userRatings.overall.attempts
-          ),
-          categories: {}
-        };
-
+        
+        // Update overall rating
+        const overallUpdate = calculateRatingChange(
+          state.userRatings.overall.rating,
+          state.userRatings.overall.ratingDeviation,
+          puzzle.rating,
+          puzzle.ratingDeviation,
+          score,
+          state.userRatings.overall.attempts
+        );
+        
+        const ratingChange = overallUpdate.newRating - state.userRatings.overall.rating;
+        
         console.log('Overall rating update:', {
           old: state.userRatings.overall.rating,
-          new: updates.overall.newRating,
-          change: updates.overall.newRating - state.userRatings.overall.rating,
-          attempts: updates.overall.attempts
+          new: overallUpdate.newRating,
+          change: ratingChange,
+          attempts: state.userRatings.overall.attempts + 1
         });
-
+        
+        state.lastRatingUpdates = {
+          overall: {
+            oldRating: state.userRatings.overall.rating,
+            newRating: overallUpdate.newRating,
+            oldRD: state.userRatings.overall.ratingDeviation,
+            newRD: overallUpdate.newRD,
+            change: ratingChange,
+            attempts: state.userRatings.overall.attempts + 1
+          },
+          categories: {}
+        };
+        
         // Update overall rating with attempts
         state.userRatings.overall = {
-          rating: updates.overall.newRating,
-          ratingDeviation: updates.overall.newRD,
-          attempts: updates.overall.attempts
+          rating: overallUpdate.newRating,
+          ratingDeviation: overallUpdate.newRD,
+          attempts: state.userRatings.overall.attempts + 1
         };
 
-        // Update category ratings with attempts tracking
+        // Process each category
         categoriesToUpdate.forEach(category => {
-          if (!category) return;
-          
-          console.log(`Processing category: ${category}`);
-          
-          const categoryRating = state.userRatings.categories[category] || {
-            rating: 1600,
-            ratingDeviation: BASE_RD,
-            attempts: 0
-          };
+          if (!state.userRatings.categories[category]) {
+            state.userRatings.categories[category] = {
+              rating: state.userRatings.overall!.rating,
+              ratingDeviation: BASE_RD,
+              attempts: 0
+            };
+          }
 
+          const categoryRating = state.userRatings.categories[category];
           const update = calculateRatingChange(
             categoryRating.rating,
             categoryRating.ratingDeviation,
-            state.currentPuzzle!.rating,
-            state.currentPuzzle!.ratingDeviation,
+            puzzle.rating,
+            puzzle.ratingDeviation,
             score,
             categoryRating.attempts
           );
 
+          const categoryChange = update.newRating - categoryRating.rating;
+
+          console.log(`Processing category: ${category}`);
           console.log(`Category ${category} rating update:`, {
             old: categoryRating.rating,
             new: update.newRating,
-            change: update.newRating - categoryRating.rating,
-            attempts: update.attempts
+            change: categoryChange,
+            attempts: categoryRating.attempts + 1
           });
 
           state.userRatings.categories[category] = {
             rating: update.newRating,
             ratingDeviation: update.newRD,
-            attempts: update.attempts
+            attempts: categoryRating.attempts + 1
           };
 
-          updates.categories[category] = update;
+          if (state.lastRatingUpdates) {
+            state.lastRatingUpdates.categories[category] = {
+              oldRating: categoryRating.rating,
+              newRating: update.newRating,
+              oldRD: categoryRating.ratingDeviation,
+              newRD: update.newRD,
+              change: categoryChange,
+              attempts: categoryRating.attempts + 1
+            };
+          }
         });
-
-        state.lastRatingUpdates = updates;
-        console.log('Final ratings state:', JSON.stringify(state.userRatings, null, 2));
 
         // Create a deep copy of the ratings for saving
         const ratingsToSave = JSON.parse(JSON.stringify(state.userRatings));
@@ -307,8 +330,6 @@ const puzzleSlice = createSlice({
 
       } catch (error) {
         console.error('❌ Error updating ratings:', error);
-      } finally {
-        console.groupEnd();
       }
     },
     loadUserRatings: (state, action: PayloadAction<{ ratings: any }>) => {
@@ -352,7 +373,7 @@ const puzzleSlice = createSlice({
   }
 });
 
-export const { setCurrentPuzzle, updateRatingsAfterPuzzle, loadUserRatings, loadLastPuzzle } = puzzleSlice.actions;
+export const { setCurrentPuzzle, updateRatings, loadUserRatings, loadLastPuzzle } = puzzleSlice.actions;
 export default puzzleSlice.reducer;
 
 // Add async thunk to load ratings

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Chess, Square } from 'chess.js';
 import { Chessboard as ReactChessboard } from 'react-chessboard';
 import { RootState, AppDispatch } from '../store/store';
-import { updateRatingsAfterPuzzle } from '../store/slices/puzzleSlice';
+import { updateRatings } from '../store/slices/puzzleSlice';
 
 interface ChessboardProps {
   size?: number;
@@ -155,7 +155,14 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
             // Puzzle completed
             setPuzzleSolved(true);
             setPuzzleFailed(false);
-            dispatch(updateRatingsAfterPuzzle({ success: true, userId: user?.id }));
+            const puzzleWithMeta = {
+              ...currentPuzzle,
+              popularity: 0,
+              nbPlays: 0,
+              gameUrl: '',
+              openingTags: []
+            };
+            dispatch(updateRatings({ success: true, userId: user?.id || '', puzzle: puzzleWithMeta }));
             onPuzzleComplete?.(true);
           } else {
             // Make opponent's next move
@@ -184,7 +191,14 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           // Incorrect move
           setPuzzleSolved(false);
           setPuzzleFailed(true);
-          dispatch(updateRatingsAfterPuzzle({ success: false, userId: user?.id }));
+          const puzzleWithMeta = {
+            ...currentPuzzle,
+            popularity: 0,
+            nbPlays: 0,
+            gameUrl: '',
+            openingTags: []
+          };
+          dispatch(updateRatings({ success: false, userId: user?.id || '', puzzle: puzzleWithMeta }));
           onPuzzleComplete?.(false);
         }
       }
