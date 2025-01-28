@@ -211,6 +211,13 @@ export default function UserMenu() {
             ) : user ? (
               <>
                 <button
+                  onClick={handleResetRatings}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Reset Ratings
+                </button>
+                <button
                   onClick={() => {
                     setShowSwitchUserModal(true);
                     setIsOpen(false);
@@ -219,13 +226,6 @@ export default function UserMenu() {
                 >
                   <User className="w-4 h-4" />
                   Switch User
-                </button>
-                <button
-                  onClick={handleResetRatings}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  Reset Ratings
                 </button>
                 <hr className="my-1" />
                 <button

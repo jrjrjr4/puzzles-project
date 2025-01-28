@@ -52,6 +52,21 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const previousPuzzle = useSelector((state: RootState) => state.puzzle.previousPuzzleId);
   const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
+  const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+
+  // Debug state with more relevant info
+  console.log(`[${category.name}] State:`, {
+    hasRatingUpdate: !!ratingUpdate,
+    wasRecentlyUpdated: lastUpdatedThemes.includes(category.name),
+    previousPuzzle: !!previousPuzzle,
+    currentPuzzle: currentPuzzle?.id,
+    rating: category.rating,
+    ratingUpdate: ratingUpdate ? {
+      old: ratingUpdate.oldRating,
+      new: ratingUpdate.newRating,
+      cleared: currentPuzzle?.id !== previousPuzzle
+    } : null
+  });
 
   // Show loading state if ratings aren't loaded yet
   if (!userRatings.loaded) {
@@ -71,7 +86,8 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   // If the rating is 0 or undefined, it means it hasn't been calculated yet
   const hasRating = category.rating !== undefined && category.rating > 0;
   const wasRecentlyUpdated = lastUpdatedThemes.includes(category.name);
-  const hasNewRatingUpdate = ratingUpdate !== undefined;
+  const showYellowHighlight = wasRecentlyUpdated && previousPuzzle && currentPuzzle?.id !== previousPuzzle;
+  const showRatingUpdate = ratingUpdate && wasRecentlyUpdated && (!previousPuzzle || currentPuzzle?.id === previousPuzzle);
 
   return (
     <div className="p-1.5 bg-gray-50 rounded-lg">
@@ -87,7 +103,11 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
         <div className="flex items-center gap-2">
           {!hasRating ? (
             <div className="text-sm text-gray-500">Not rated</div>
-          ) : ratingUpdate ? (
+          ) : showYellowHighlight ? (
+            <div className="text-sm font-semibold text-yellow-600">
+              {Math.round(category.rating)}
+            </div>
+          ) : showRatingUpdate ? (
             <div className="flex items-center gap-1">
               <div className="text-sm font-semibold text-blue-600">
                 {Math.round(ratingUpdate.oldRating)}
@@ -100,10 +120,6 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
               }`}>
                 {Math.round(ratingUpdate.newRating)}
               </div>
-            </div>
-          ) : wasRecentlyUpdated ? (
-            <div className="text-sm font-semibold text-yellow-600">
-              {Math.round(category.rating)}
             </div>
           ) : (
             <div className="text-sm font-semibold text-blue-600">
