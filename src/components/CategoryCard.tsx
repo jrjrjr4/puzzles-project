@@ -20,6 +20,7 @@ import { CategoryRating } from '../types/category';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import RatingBar from './RatingBar';
+import { RatingUpdate } from '../types'; // Assuming you have a RatingUpdate type
 
 const categoryIcons: Record<string, LucideIcon> = {
   'Crushing': Hammer,
@@ -43,12 +44,13 @@ interface CategoryCardProps {
     ratingDeviation?: number;
   };
   averageRating: number;
+  lastRatingUpdates?: { categories: { [key: string]: RatingUpdate } }; // Optional prop for rating updates
 }
 
-export function CategoryCard({ category, averageRating }: CategoryCardProps) {
+export function CategoryCard({ category, averageRating, lastRatingUpdates }: CategoryCardProps) {
   const Icon = categoryIcons[category.name] || Crosshair;
-  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
-  const ratingUpdate = lastRatingUpdates?.categories[category.name];
+  const lastRatingUpdatesState = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
+  const ratingUpdate = lastRatingUpdatesState?.categories[category.name];
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const previousPuzzle = useSelector((state: RootState) => state.puzzle.previousPuzzleId);
   const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
@@ -88,6 +90,9 @@ export function CategoryCard({ category, averageRating }: CategoryCardProps) {
   const wasRecentlyUpdated = lastUpdatedThemes.includes(category.name);
   const showYellowHighlight = wasRecentlyUpdated && previousPuzzle && currentPuzzle?.id !== previousPuzzle;
   const showRatingUpdate = ratingUpdate && wasRecentlyUpdated && (!previousPuzzle || currentPuzzle?.id === previousPuzzle);
+
+  const update = lastRatingUpdates?.categories[category.name];
+  const hasUpdate = !!update;
 
   return (
     <div className="p-1.5 bg-gray-50 rounded-lg">

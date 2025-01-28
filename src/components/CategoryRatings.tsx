@@ -5,9 +5,8 @@ import { categories } from '../data/categories';
 import { calculateAverageRating } from '../utils/ratings';
 import { CategoryCard } from './CategoryCard';
 
-export default function CategoryRatings() {
+export default function CategoryRatings({ lastRatingUpdates }: { lastRatingUpdates: any }) {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
-  const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   
   // Show loading state until ratings are fully loaded
   if (!userRatings.loaded) {
@@ -90,6 +89,7 @@ export default function CategoryRatings() {
                   ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}
+                lastRatingUpdates={lastRatingUpdates}
               />
             ))}
           </div>
@@ -106,6 +106,7 @@ export default function CategoryRatings() {
                   ratingDeviation: userRatings.categories[category.name]?.ratingDeviation || 350
                 }}
                 averageRating={averageRating}
+                lastRatingUpdates={lastRatingUpdates}
               />
             ))}
           </div>

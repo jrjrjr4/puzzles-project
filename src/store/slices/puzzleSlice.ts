@@ -95,9 +95,13 @@ const puzzleSlice = createSlice({
         });
       }
 
+      // Store the previous puzzle ID before updating
+      if (state.currentPuzzle) {
+        state.previousPuzzleId = state.currentPuzzle.id;
+      }
+      
       state.currentPuzzle = action.payload;
-      // Clear lastUpdatedThemes when moving to a new puzzle
-      state.lastUpdatedThemes = [];
+      
       const end = performance.now();
       console.log('puzzleStateUpdate:', end - start, 'ms');
     },
@@ -107,9 +111,10 @@ const puzzleSlice = createSlice({
     }>) => {
       state.userRatings = action.payload.userRatings;
       state.lastRatingUpdates = action.payload.lastRatingUpdates;
-      // Store the themes from the puzzle that was just completed
+      // Store the themes and ID from the puzzle that was just completed
       const previousPuzzleThemes = state.currentPuzzle?.themes || [];
       state.lastUpdatedThemes = previousPuzzleThemes;
+      state.previousPuzzleId = state.currentPuzzle?.id || null;
     },
     loadLastPuzzle: (state) => {
       // This is now just a placeholder - actual loading happens in the thunk
@@ -152,6 +157,12 @@ const puzzleSlice = createSlice({
       }
       
       console.groupEnd();
+    },
+    startPuzzle: (state) => {
+      if (!state.currentPuzzle) return;
+      
+      // Clear lastUpdatedThemes when user starts making moves on the new puzzle
+      state.lastUpdatedThemes = [];
     }
   }
 });
@@ -388,7 +399,10 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
       });
       
       const categoriesToUpdate = currentPuzzle.themes.length > 0 
-        ? currentPuzzle.themes 
+        ? currentPuzzle.themes.map(theme => {
+            const mappedCategory = themeToCategory[theme.toLowerCase()];
+            return mappedCategory || theme;
+          })
         : ['Tactics'];
 
       const overallUpdate = calculateRatingChange(
