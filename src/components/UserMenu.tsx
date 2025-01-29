@@ -121,15 +121,57 @@ export default function UserMenu() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     console.group('📝 Sign Up Process');
-    console.log('Attempting to sign up with email:', email);
     
     setError(null);
     setIsLoading(true);
 
     try {
-      if (!email) {
+      // Clean up the email by trimming whitespace and converting to lowercase
+      const rawEmail = email;
+      const cleanEmail = email.trim().toLowerCase();
+      
+      // Debug email processing
+      console.log('Email validation debug:', {
+        rawEmail,
+        cleanEmail,
+        length: cleanEmail.length,
+        containsSpaces: cleanEmail.includes(' '),
+        characters: Array.from(cleanEmail).map(c => ({
+          char: c,
+          code: c.charCodeAt(0)
+        }))
+      });
+
+      if (!cleanEmail) {
         throw new Error('Please enter your email address');
       }
+
+      // Supabase-specific email validation
+      // Only allow letters, numbers, and common email special characters
+      const emailLocalPart = cleanEmail.split('@')[0];
+      const emailDomain = cleanEmail.split('@')[1];
+      
+      // Validate local part (before @)
+      if (emailLocalPart.length < 3) {
+        throw new Error('Email username must be at least 3 characters long');
+      }
+      
+      if (!/^[a-z0-9][a-z0-9._-]*[a-z0-9]$/.test(emailLocalPart)) {
+        throw new Error('Email username can only contain letters, numbers, dots, hyphens and underscores, and must start and end with a letter or number');
+      }
+
+      // Validate domain part (after @)
+      if (!/^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/.test(emailDomain)) {
+        throw new Error('Invalid email domain format');
+      }
+
+      console.log('Email validation details:', {
+        localPart: emailLocalPart,
+        domain: emailDomain,
+        localValid: /^[a-z0-9][a-z0-9._-]*[a-z0-9]$/.test(emailLocalPart),
+        domainValid: /^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/.test(emailDomain)
+      });
+
       if (!password) {
         throw new Error('Please choose a password');
       }
@@ -137,25 +179,86 @@ export default function UserMenu() {
         throw new Error('Password must be at least 6 characters long');
       }
 
+      console.log('Attempting Supabase signup with:', {
+        email: cleanEmail,
+        passwordLength: password.length
+      });
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: window.location.origin,
+          data: {
+            email_confirm: true,
+            email_validated: true,
+            preferred_username: emailLocalPart
+          }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase signup error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          stack: error.stack,
+          originalEmail: cleanEmail
+        });
+
+        // Handle specific Supabase error cases
+        if (error.message.toLowerCase().includes('email') && error.message.toLowerCase().includes('invalid')) {
+          // Try signing in instead - the email might already be registered
+          console.log('Attempting sign in as fallback...');
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password
+          });
+
+          if (signInError) {
+            console.error('Sign in fallback failed:', signInError);
+            throw new Error('This email address cannot be used. Please try a different email address or check if you already have an account.');
+          }
+
+          if (signInData?.user) {
+            console.log('Successfully signed in instead of signing up');
+            setShowSignInModal(false);
+            setEmail('');
+            setPassword('');
+            return;
+          }
+        }
+
+        // If we get here, neither signup nor signin worked
+        if (error.status === 400) {
+          throw new Error('Unable to create account. Please try a different email address.');
+        } else if (error.status === 422) {
+          throw new Error('Email validation failed. Please check your email format.');
+        }
+        throw error;
+      }
+      
       if (data?.user?.identities?.length === 0) {
         throw new Error('This email is already registered. Please sign in instead.');
       }
 
-      alert('Check your email for the confirmation link!');
+      console.log('Signup successful:', {
+        user: data?.user?.id,
+        email: data?.user?.email,
+        confirmationSent: true
+      });
+
+      alert('Please check your email for the confirmation link to complete your registration!');
       setShowSignInModal(false);
       setEmail('');
       setPassword('');
     } catch (error: any) {
-      console.error('❌ Sign up error:', error.message);
+      console.error('❌ Sign up error:', {
+        message: error.message,
+        type: typeof error,
+        isAuthError: error.name === 'AuthApiError',
+        fullError: error
+      });
       setError(error.message);
     } finally {
       setIsLoading(false);
