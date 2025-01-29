@@ -20,7 +20,7 @@ import { CategoryRating } from '../types/category';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import RatingBar from './RatingBar';
-import { RatingUpdate } from '../types'; // Assuming you have a RatingUpdate type
+import { RatingUpdate } from '../types/puzzle';
 
 const categoryIcons: Record<string, LucideIcon> = {
   'Crushing': Hammer,
@@ -44,7 +44,7 @@ interface CategoryCardProps {
     ratingDeviation?: number;
   };
   averageRating: number;
-  lastRatingUpdates?: { categories: { [key: string]: RatingUpdate } }; // Optional prop for rating updates
+  lastRatingUpdates?: { categories: { [key: string]: RatingUpdate } };
 }
 
 export function CategoryCard({ category, averageRating, lastRatingUpdates }: CategoryCardProps) {
@@ -55,20 +55,6 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
   const previousPuzzle = useSelector((state: RootState) => state.puzzle.previousPuzzleId);
   const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
-
-  // Debug state with more relevant info
-  console.log(`[${category.name}] State:`, {
-    hasRatingUpdate: !!ratingUpdate,
-    wasRecentlyUpdated: lastUpdatedThemes.includes(category.name),
-    previousPuzzle: !!previousPuzzle,
-    currentPuzzle: currentPuzzle?.id,
-    rating: category.rating,
-    ratingUpdate: ratingUpdate ? {
-      old: ratingUpdate.oldRating,
-      new: ratingUpdate.newRating,
-      cleared: currentPuzzle?.id !== previousPuzzle
-    } : null
-  });
 
   // Show loading state if ratings aren't loaded yet
   if (!userRatings.loaded) {

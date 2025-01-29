@@ -80,14 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastUserId = useRef<string | null>(null);
 
   const setupGuestSession = async () => {
-    console.log('🔄 Setting up guest session');
     let guestSession = safeLocalStorageGet(GUEST_SESSION_KEY);
     
     if (!guestSession) {
       const newGuestSession = createGuestSession();
       if (safeLocalStorageSet(GUEST_SESSION_KEY, JSON.stringify(newGuestSession))) {
         guestSession = JSON.stringify(newGuestSession);
-        console.log('✨ Created new guest session');
       }
     }
     
@@ -110,116 +108,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch(setUser(guestUser));
         lastUserId.current = guestUser.id;
         ratingsLoaded.current = true;
-        console.log('✅ Guest session loaded successfully');
-
-        // Clear current puzzle to trigger auto-load
         dispatch(setCurrentPuzzle(null));
       } catch (err) {
-        console.error('❌ Error parsing guest session:', err);
+        console.error('Error setting up guest session:', err);
         throw err;
       }
     } else {
-      console.error('❌ Failed to create or load guest session');
       throw new Error('Failed to create or load guest session');
     }
   };
 
   const loadRatings = async (session: Session | null) => {
-    console.log('📊 loadRatings called with session:', session?.user?.id);
-    
-    // Force reload if switching between guest and authenticated user
     const isGuest = !session?.user || session.user.user_metadata?.is_guest;
     const wasGuest = !lastUserId.current || lastUserId.current.startsWith('guest_');
     const userChanged = session?.user?.id !== lastUserId.current;
     
     if (ratingsLoaded.current && !userChanged && isGuest === wasGuest) {
-      console.log('⏭️ Ratings already loaded, skipping');
       return;
     }
 
     try {
       if (session?.user) {
-        console.log('👤 Loading ratings for user:', session.user.id, isGuest ? '(guest)' : '');
-        
         if (isGuest) {
           const savedSession = safeLocalStorageGet(GUEST_SESSION_KEY);
           if (savedSession) {
             try {
               const guestSession: GuestSession = JSON.parse(savedSession);
-              console.log('📝 Found saved guest session:', guestSession);
               dispatch(loadUserRatings({ ratings: guestSession.ratings }));
               ratingsLoaded.current = true;
               lastUserId.current = session.user.id;
-              
-              // Clear current puzzle to trigger auto-load
               dispatch(setCurrentPuzzle(null));
               return;
             } catch (err) {
-              console.error('❌ Error parsing guest session:', err);
+              console.error('Error loading guest ratings:', err);
             }
           }
         }
         
-        console.log('🔄 Fetching ratings from Supabase for user:', session.user.id);
         await dispatch(fetchUserRatings(session.user.id));
         ratingsLoaded.current = true;
         lastUserId.current = session.user.id;
-        
-        // Clear current puzzle to trigger auto-load
         dispatch(setCurrentPuzzle(null));
       } else {
         await setupGuestSession();
       }
     } catch (error) {
-      console.error('❌ Error in loadRatings:', error);
+      console.error('Error loading ratings:', error);
       throw error;
     }
   }
 
   useEffect(() => {
-    console.log('🔐 Auth Provider Initialization - Attempt:', initializationAttempts.current + 1);
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         dispatch(setLoading(true));
-        console.log('🔍 Checking for existing session...');
         
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error('❌ Session error:', sessionError);
+          console.error('Auth session error:', sessionError);
           dispatch(setError(sessionError.message));
           return;
         }
 
-        console.log('📡 Session check result:', session ? 'Active session found' : 'No active session');
-        
         if (session) {
-          console.log('🔑 Setting user:', session.user.id);
+          console.log('Auth: User session found', {
+            provider: session.user?.app_metadata?.provider,
+            email: session.user?.email
+          });
           dispatch(setUser(session.user));
           await loadRatings(session);
         } else {
-          console.log('👤 No session, initializing guest mode');
+          console.log('Auth: No active session, using guest mode');
           await loadRatings(null);
         }
 
         if (mounted) {
-          console.log('✅ Initialization complete');
           authStateChangeEnabled.current = true;
           setIsInitializing(false);
         }
       } catch (error) {
-        console.error('❌ Auth initialization error:', error);
+        console.error('Auth initialization error:', error);
         dispatch(setError(error instanceof Error ? error.message : 'Unknown error'));
         
         if (initializationAttempts.current < maxInitAttempts) {
-          console.log('🔄 Retrying initialization...');
           initializationAttempts.current += 1;
           setTimeout(initializeAuth, 1000);
         } else {
-          console.error('❌ Max initialization attempts reached');
           if (mounted) {
             authStateChangeEnabled.current = true;
             setIsInitializing(false);
@@ -232,10 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Set a timeout to prevent infinite loading
     timeoutId = setTimeout(() => {
       if (mounted && isInitializing) {
-        console.error('⏰ Auth initialization timed out');
+        console.error('Auth initialization timed out');
         setIsInitializing(false);
         authStateChangeEnabled.current = true;
         dispatch(setError('Authentication initialization timed out'));
@@ -245,38 +222,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth State Change');
-      console.log('Event:', event);
-      console.log('Session:', session ? 'User logged in' : 'User logged out');
+      if (!authStateChangeEnabled.current) return;
 
-      // Skip if we're still initializing or if this is just a token refresh
-      if (!authStateChangeEnabled.current || event === 'TOKEN_REFRESHED') {
-        console.log('⚠️ Skipping auth state change - component unmounted or initialization incomplete');
-        return;
-      }
+      console.log('Auth: State changed', {
+        event,
+        provider: session?.user?.app_metadata?.provider,
+        email: session?.user?.email
+      });
 
-      dispatch(setLoading(true));
-      try {
-        if (event === 'SIGNED_OUT') {
-          console.log('🚪 User signed out, transitioning to guest mode');
-          ratingsLoaded.current = false; // Reset ratings loaded flag
-          dispatch(setCurrentPuzzle(null)); // Clear current puzzle
-          await setupGuestSession();
-        } else if (session?.user && session.user.id !== lastUserId.current) {
-          console.log('👤 Setting user on auth change:', session.user.id);
-          dispatch(setUser(session.user));
-          await loadRatings(session);
+      if (event === 'SIGNED_IN') {
+        if (session?.user?.app_metadata?.provider === 'google') {
+          console.log('Auth: Successfully signed in with Google');
         }
-      } catch (error) {
-        console.error('❌ Auth state change error:', error);
-        dispatch(setError(error instanceof Error ? error.message : 'Unknown error'));
-      } finally {
-        dispatch(setLoading(false));
+        dispatch(setUser(session?.user || null));
+        await loadRatings(session);
+      } else if (event === 'SIGNED_OUT') {
+        console.log('Auth: User signed out');
+        dispatch(setUser(null));
+        await loadRatings(null);
       }
     });
 
     return () => {
-      console.log('🧹 Cleaning up AuthProvider');
       mounted = false;
       clearTimeout(timeoutId);
       subscription.unsubscribe();
@@ -284,7 +251,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [dispatch]);
 
   if (isInitializing) {
-    console.log('⌛ Showing loading spinner...');
     return <LoadingSpinner />;
   }
 

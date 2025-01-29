@@ -1,5 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import { User } from '@supabase/supabase-js';
+import { supabase } from '../../utils/supabase';
 
 interface AuthState {
   user: User | null;
@@ -12,6 +13,31 @@ const initialState: AuthState = {
   loading: true,
   error: null,
 };
+
+export const signInWithGoogle = createAsyncThunk(
+  'auth/signInWithGoogle',
+  async (_, { dispatch }) => {
+    try {
+      dispatch(setLoading(true));
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        dispatch(setError(error.message));
+        throw error;
+      }
+    } catch (error) {
+      dispatch(setError(error instanceof Error ? error.message : 'Failed to sign in with Google'));
+      throw error;
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
