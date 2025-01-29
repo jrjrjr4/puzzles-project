@@ -1,11 +1,13 @@
 import { useSelector } from 'react-redux';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { RootState } from './store/store';
 import { AuthProvider } from './providers/AuthProvider';
 import { Auth } from './components/Auth';
 import Header from './components/Header';
 import GameSection from './components/GameSection';
+import AuthCallback from './components/AuthCallback';
 
-function AppContent() {
+function MainContent() {
   const { user, loading } = useSelector((state: RootState) => state.auth);
 
   if (loading) {
@@ -24,12 +26,15 @@ function AppContent() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Router>
+        <Routes>
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="*" element={<MainContent />} />
+        </Routes>
+      </Router>
     </AuthProvider>
   );
 }
-
-export default App;

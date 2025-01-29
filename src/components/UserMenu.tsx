@@ -338,23 +338,10 @@ export default function UserMenu() {
       setError(null);
       setIsLoading(true);
 
-      // Determine if we're in development or production
-      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const redirectUrl = isDevelopment 
-        ? `${window.location.origin}/auth/callback`
-        : 'https://puzzles-project.vercel.app/auth/callback';
-
-      console.log('OAuth environment:', {
-        isDevelopment,
-        redirectUrl,
-        currentOrigin: window.location.origin,
-        hostname: window.location.hostname
-      });
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       });
 
@@ -364,10 +351,9 @@ export default function UserMenu() {
     } catch (error: any) {
       console.error('Google sign in error:', error.message);
       setError(error.message);
-    } finally {
       setIsLoading(false);
-      console.groupEnd();
     }
+    console.groupEnd();
   };
 
   // Separate component for Google button to ensure it's always rendered
