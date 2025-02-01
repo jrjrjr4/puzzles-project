@@ -5,6 +5,7 @@ import { User, LogOut, Settings, UserCircle, LogIn, X } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { loadUserRatings } from '../store/slices/puzzleSlice';
 import { categories } from '../data/categories';
+import { setUser, setError } from '../store/slices/authSlice';
 
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -356,6 +357,27 @@ export default function UserMenu() {
     console.groupEnd();
   };
 
+  const handleSwitchUser = async () => {
+    console.group('🔄 Switch User Process');
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      // Clear user state in Redux and reset any error
+      dispatch(setUser(null) as any);
+      dispatch(setError(null) as any);
+      // Open the sign-in modal, ensuring the Google sign-in button is visible
+      setShowSignInModal(true);
+      // Close the switch user modal if it's open
+      setShowSwitchUserModal(false);
+      console.log('User signed out successfully, ready to sign in again.');
+    } catch (error: any) {
+      console.error('Error switching user:', error.message);
+      dispatch(setError(error.message));
+    } finally {
+      console.groupEnd();
+    }
+  };
+
   // Separate component for Google button to ensure it's always rendered
   const GoogleSignInButton = () => {
     console.log('Rendering Google Sign In button');
@@ -488,6 +510,16 @@ export default function UserMenu() {
             </button>
           </div>
         </form>
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleSwitchUser}
+            className="w-full flex justify-center rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Switch User
+          </button>
+        </div>
       </>
     );
 

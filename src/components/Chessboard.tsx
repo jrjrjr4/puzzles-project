@@ -56,18 +56,23 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
   const [currentMoveIndex, setCurrentMoveIndex] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Update game when puzzle changes and show opponent's first move
+  // Update game when puzzle changes and show opponent's first move with detailed debugging
   useEffect(() => {
     async function setupPuzzle() {
+      console.debug('setupPuzzle triggered', { timestamp: Date.now(), currentPuzzle });
       try {
         if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
+          console.debug('setupPuzzle: Valid puzzle detected. Starting setup.');
+
           // Disable animations initially
           setTransitionDuration(0);
           setIsAnimating(true);
-          
+
           // Reset the game with the puzzle position
           const newGame = new Chess();
           newGame.load(currentPuzzle.fen);
+          console.debug('setupPuzzle: Loaded puzzle FEN', { loadedFEN: newGame.fen() });
+
           setGame(newGame);
           setCurrentMoveIndex(1);
           setPuzzleSolved(false);
@@ -75,40 +80,46 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           setHighlightedSquares({});
           setSelectedSquare(null);
           setLegalMoves({});
-          
-          // Set board orientation to match the side that needs to move after the first move
-          setBoardOrientation(currentPuzzle.fen.split(' ')[1] === 'w' ? 'black' : 'white');
-          
-          // Wait for state updates to complete
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
+
+          // Set board orientation
+          const sideToMove = currentPuzzle.fen.split(' ')[1];
+          const newOrientation = sideToMove === 'w' ? 'black' : 'white';
+          setBoardOrientation(newOrientation);
+          console.debug('setupPuzzle: Board orientation set', { sideToMove, newOrientation });
+
           // Make the first move (opponent's move)
           const firstMove = currentPuzzle.moves[0];
-          const [fromSquare, toSquare] = [firstMove.slice(0, 2), firstMove.slice(2, 4)];
+          const fromSquare = firstMove.slice(0, 2);
+          const toSquare = firstMove.slice(2, 4);
           newGame.move({
             from: fromSquare,
             to: toSquare,
             promotion: firstMove[4] || 'q'
           });
-          
-          // Update game state with the new position
+          console.debug('setupPuzzle: Opponent move made', { fromSquare, toSquare, postMoveFEN: newGame.fen() });
+
+          // Update game state with the new position and highlight the move
           setGame(new Chess(newGame.fen()));
-          
-          // Highlight the move
           setHighlightedSquares({
             [fromSquare]: HIGHLIGHT_COLOR,
             [toSquare]: HIGHLIGHT_COLOR
           });
-          
-          // Re-enable animations after a short delay
-          await new Promise(resolve => setTimeout(resolve, 100));
-          setTransitionDuration(150);
-          setIsAnimating(false);
+          console.debug('setupPuzzle: Highlight set', { highlightedSquares: { [fromSquare]: HIGHLIGHT_COLOR, [toSquare]: HIGHLIGHT_COLOR } });
+
+          // Re-enable animations on next frame to avoid flash
+          requestAnimationFrame(() => {
+            setTransitionDuration(150);
+            setIsAnimating(false);
+            console.debug('setupPuzzle: Animations re-enabled', { transitionDuration: 150, isAnimating: false });
+          });
+        } else {
+          console.debug('setupPuzzle: Skipped setup due to invalid puzzle', { currentPuzzle });
         }
       } catch (error) {
         console.error('Error setting up puzzle:', error);
       } finally {
         setIsLoading(false);
+        console.debug('setupPuzzle: Final block executed', { isLoading: false });
       }
     }
 
@@ -313,6 +324,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
     return true; // Always return true to prevent the piece from snapping back
   };
 
+  console.debug('Chessboard rendering with FEN', { fen: game.fen() });
   return (
     <div className="space-y-4">
       <div className="w-full aspect-square">
@@ -325,6 +337,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           customSquareStyles={{ ...highlightedSquares, ...legalMoves }}
           animationDuration={transitionDuration}
           customBoardStyle={{
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
