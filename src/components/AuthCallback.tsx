@@ -12,31 +12,45 @@ export default function AuthCallback() {
     const handleCallback = async () => {
       console.group('🔐 Auth Callback Processing');
       try {
+        console.log('Auth callback started', {
+          url: window.location.href,
+          search: window.location.search,
+          hash: window.location.hash,
+          state: window.history.state
+        });
+
         // Get the hash fragment from the URL (remove the leading '#' if it exists)
         const hashFragment = window.location.hash.startsWith('#') 
           ? window.location.hash.substring(1)
           : window.location.hash;
 
-        console.log('Processing callback URL:', {
+        console.log('URL components:', {
           fullUrl: window.location.href,
           hash: hashFragment,
-          pathname: window.location.pathname
+          pathname: window.location.pathname,
+          origin: window.location.origin
         });
 
-        if (!hashFragment || !hashFragment.includes('access_token')) {
-          console.warn('No auth tokens found in URL');
+        if (!hashFragment && !window.location.search) {
+          console.warn('No auth tokens found in URL or search params');
           throw new Error('No authentication tokens found');
         }
 
-        // Parse the hash fragment
-        const params = new URLSearchParams(hashFragment);
+        // Try to get tokens from either hash or search params
+        const params = new URLSearchParams(hashFragment || window.location.search);
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
+
+        console.log('Auth tokens found:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken
+        });
 
         if (!accessToken) {
           throw new Error('Access token is missing');
         }
 
+        console.log('Setting Supabase session...');
         // Set the session in Supabase
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
@@ -60,13 +74,15 @@ export default function AuthCallback() {
 
         console.log('Session successfully established:', {
           email: user.email,
-          provider: user.app_metadata?.provider
+          provider: user.app_metadata?.provider,
+          id: user.id
         });
 
         // Update Redux store with user data
         dispatch(setUser(user));
 
         // Redirect to home page after a short delay
+        console.log('Redirecting to home page...');
         setTimeout(() => {
           navigate('/', { replace: true });
         }, 500);
@@ -76,6 +92,7 @@ export default function AuthCallback() {
         dispatch(setError(error instanceof Error ? error.message : 'Authentication failed'));
         
         // Redirect to login page after error
+        console.log('Redirecting to login page due to error...');
         setTimeout(() => {
           navigate('/login', { replace: true });
         }, 500);
