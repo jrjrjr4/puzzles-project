@@ -126,13 +126,13 @@ function computePuzzleScore(
     
     if (themeRatings.length === 0) {
         log(`Puzzle ${puzzle.id} has no valid themes`);
-        return 0.0;
+        return 0.00;
     }
     
     const puzzleRatingForUser = themeRatings.reduce((a, b) => a + b, 0) / themeRatings.length;
     const diff = Math.abs(puzzle.rating - puzzleRatingForUser);
     
-    // Compute components of the score
+    // Compute components of the scores
     const popularityComponent = Math.pow(puzzle.popularity / 100, beta);  // Divide by 100 as popularity is in percentage
     const ratingPenalty = 1 / (1 + Math.pow(diff, gamma));
     const score = popularityComponent * ratingPenalty;
