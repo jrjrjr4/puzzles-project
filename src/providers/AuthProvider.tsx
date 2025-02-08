@@ -8,7 +8,7 @@ import { AppDispatch } from '../store/store';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const GUEST_SESSION_KEY = 'guestSession';
-const INIT_TIMEOUT = 10000; // 10 second timeout
+const INIT_TIMEOUT = 30000; // 30 second timeout
 
 interface GuestSession {
   guestId: string;
@@ -55,7 +55,7 @@ const safeLocalStorageGet = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
   } catch (error) {
-    console.error('❌ LocalStorage access error:', error);
+    console.warn('LocalStorage access error - this is expected in some browsers:', error);
     return null;
   }
 };
@@ -65,7 +65,7 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
     localStorage.setItem(key, value);
     return true;
   } catch (error) {
-    console.error('❌ LocalStorage write error:', error);
+    console.warn('LocalStorage write error - this is expected in some browsers:', error);
     return false;
   }
 };
@@ -84,37 +84,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (!guestSession) {
       const newGuestSession = createGuestSession();
-      if (safeLocalStorageSet(GUEST_SESSION_KEY, JSON.stringify(newGuestSession))) {
-        guestSession = JSON.stringify(newGuestSession);
-      }
+      safeLocalStorageSet(GUEST_SESSION_KEY, JSON.stringify(newGuestSession));
+      guestSession = JSON.stringify(newGuestSession);
     }
     
-    if (guestSession) {
-      try {
-        const parsedSession: GuestSession = JSON.parse(guestSession);
-        dispatch(loadUserRatings({ ratings: parsedSession.ratings }));
-        
-        const guestUser = {
-          id: parsedSession.guestId,
-          email: undefined,
-          user_metadata: { is_guest: true },
-          app_metadata: {},
-          aud: 'guest',
-          created_at: new Date().toISOString(),
-          role: 'authenticated',
-          updated_at: new Date().toISOString()
-        };
-        
-        dispatch(setUser(guestUser));
-        lastUserId.current = guestUser.id;
-        ratingsLoaded.current = true;
-        dispatch(setCurrentPuzzle(null));
-      } catch (err) {
-        console.error('Error setting up guest session:', err);
-        throw err;
-      }
-    } else {
-      throw new Error('Failed to create or load guest session');
+    try {
+      const parsedSession: GuestSession = JSON.parse(guestSession);
+      dispatch(loadUserRatings({ ratings: parsedSession.ratings }));
+      
+      const guestUser = {
+        id: parsedSession.guestId,
+        email: undefined,
+        user_metadata: { is_guest: true },
+        app_metadata: {},
+        aud: 'guest',
+        created_at: new Date().toISOString(),
+        role: 'authenticated',
+        updated_at: new Date().toISOString()
+      };
+      
+      dispatch(setUser(guestUser));
+      lastUserId.current = guestUser.id;
+      ratingsLoaded.current = true;
+      dispatch(setCurrentPuzzle(null));
+    } catch (err) {
+      console.error('Error setting up guest session:', err);
+      const newGuestSession = createGuestSession();
+      safeLocalStorageSet(GUEST_SESSION_KEY, JSON.stringify(newGuestSession));
+      return setupGuestSession();
     }
   };
 
