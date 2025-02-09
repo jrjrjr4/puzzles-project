@@ -168,6 +168,15 @@ const puzzleSlice = createSlice({
       // Clear lastUpdatedThemes when user starts making moves on the new puzzle
       state.lastUpdatedThemes = [];
     }
+  },
+  extraReducers: (builder) => {
+    builder.addCase(updateRatingsAfterPuzzleAsync.fulfilled, (state, action) => {
+      if (action.payload) {
+        state.lastRatingUpdates = action.payload.lastRatingUpdates;
+        // Update lastUpdatedThemes with the categories that were updated
+        state.lastUpdatedThemes = Object.keys(action.payload.lastRatingUpdates.categories);
+      }
+    });
   }
 });
 
