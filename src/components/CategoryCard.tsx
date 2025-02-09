@@ -52,7 +52,7 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
   const lastRatingUpdatesState = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   const ratingUpdate = lastRatingUpdatesState?.categories[category.name];
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
-  const previousPuzzle = useSelector((state: RootState) => state.puzzle.previousPuzzleId);
+  const lastPuzzleIdForRatingUpdates = useSelector((state: RootState) => state.puzzle.lastPuzzleIdForRatingUpdates);
   const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
 
@@ -74,8 +74,20 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
   // If the rating is 0 or undefined, it means it hasn't been calculated yet
   const hasRating = category.rating !== undefined && category.rating > 0;
   const wasRecentlyUpdated = lastUpdatedThemes.includes(category.name);
-  const showYellowHighlight = wasRecentlyUpdated && previousPuzzle && currentPuzzle?.id !== previousPuzzle;
-  const showRatingUpdate = ratingUpdate && wasRecentlyUpdated && (!previousPuzzle || currentPuzzle?.id === previousPuzzle);
+  const showRatingUpdate = wasRecentlyUpdated && ratingUpdate && (currentPuzzle?.id === lastPuzzleIdForRatingUpdates);
+  const showYellowHighlight = wasRecentlyUpdated && ratingUpdate && (currentPuzzle?.id !== lastPuzzleIdForRatingUpdates);
+
+  // Debug logs
+  console.log(`[CategoryCard ${category.name}] State:`, {
+    hasRating,
+    wasRecentlyUpdated,
+    showRatingUpdate,
+    showYellowHighlight,
+    ratingUpdate,
+    lastPuzzleIdForRatingUpdates,
+    currentPuzzleId: currentPuzzle?.id,
+    lastUpdatedThemes,
+  });
 
   const update = lastRatingUpdates?.categories[category.name];
   const hasUpdate = !!update;
@@ -94,11 +106,7 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
         <div className="flex items-center gap-2">
           {!hasRating ? (
             <div className="text-sm text-gray-500">Not rated</div>
-          ) : showYellowHighlight ? (
-            <div className="text-sm font-semibold text-yellow-600">
-              {Math.round(category.rating)}
-            </div>
-          ) : showRatingUpdate ? (
+          ) : showRatingUpdate && ratingUpdate ? (
             <div className="flex items-center gap-1">
               <div className="text-sm font-semibold text-blue-600">
                 {Math.round(ratingUpdate.oldRating)}
@@ -111,6 +119,10 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
               }`}>
                 {Math.round(ratingUpdate.newRating)}
               </div>
+            </div>
+          ) : showYellowHighlight ? (
+            <div className="text-sm font-semibold text-yellow-600">
+              {Math.round(category.rating)}
             </div>
           ) : (
             <div className="text-sm font-semibold text-blue-600">

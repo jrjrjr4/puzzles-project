@@ -42,6 +42,7 @@ interface PuzzleState {
   } | null;
   previousPuzzleId: string | null;
   lastUpdatedThemes: string[];
+  lastPuzzleIdForRatingUpdates: string | null;
 }
 
 const initialState: PuzzleState = {
@@ -54,6 +55,7 @@ const initialState: PuzzleState = {
   lastRatingUpdates: null,
   previousPuzzleId: null,
   lastUpdatedThemes: [],
+  lastPuzzleIdForRatingUpdates: null
 };
 
 // Type guard function
@@ -144,7 +146,7 @@ const puzzleSlice = createSlice({
         loaded: true,
         overall: action.payload.ratings.overall || defaultRatings.overall,
         categories: {
-          ...defaultRatings.categories,  // Start with default ratings for all categories
+          ...defaultCategories,  // Start with default ratings for all categories
           ...action.payload.ratings.categories  // Override with any existing ratings
         }
       };
@@ -175,6 +177,8 @@ const puzzleSlice = createSlice({
         state.lastRatingUpdates = action.payload.lastRatingUpdates;
         // Update lastUpdatedThemes with the categories that were updated
         state.lastUpdatedThemes = Object.keys(action.payload.lastRatingUpdates.categories);
+        // Set the puzzle id for which these updates were computed
+        state.lastPuzzleIdForRatingUpdates = state.currentPuzzle ? state.currentPuzzle.id : null;
       }
     });
   }
