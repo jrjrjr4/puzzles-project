@@ -30,9 +30,11 @@ const setupGuestSession = async (dispatch: AppDispatch) => {
     dispatch(
       setUser({
         id: session.guestId,
-        email: null,
-        isGuest: true,
-        user_metadata: {}
+        email: undefined,
+        app_metadata: {},
+        user_metadata: { is_guest: true },
+        aud: 'authenticated',
+        created_at: new Date().toISOString()
       })
     );
     dispatch(setCurrentPuzzle(null));
@@ -63,9 +65,11 @@ const setupGuestSession = async (dispatch: AppDispatch) => {
     dispatch(
       setUser({
         id: newSession.guestId,
-        email: null,
-        isGuest: true,
-        user_metadata: {}
+        email: undefined,
+        app_metadata: {},
+        user_metadata: { is_guest: true },
+        aud: 'authenticated',
+        created_at: new Date().toISOString()
       })
     );
     dispatch(setCurrentPuzzle(null));

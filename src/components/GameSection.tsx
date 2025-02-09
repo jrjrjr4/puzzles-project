@@ -494,7 +494,7 @@ export default function GameSection() {
             <PuzzleInfo />
           </div>
           <div>
-            <CategoryRatings />
+            <CategoryRatings lastRatingUpdates={lastRatingUpdates} />
           </div>
           <div className="md:hidden bg-gray-50">
             <PuzzleInfo />

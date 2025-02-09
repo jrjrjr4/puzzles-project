@@ -6,7 +6,7 @@ import { User, LogOut, Settings, UserCircle, LogIn, X } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { loadUserRatings } from '../store/slices/puzzleSlice';
 import { categories } from '../data/categories';
-import { signInWithGoogle, setUser, setError } from '../store/slices/authSlice';
+import { signInWithGoogle, authSlice } from '../store/slices/authSlice';
 
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,8 +71,8 @@ export default function UserMenu() {
       console.log('Successfully signed out from Supabase');
 
       // Clear user state in Redux
-      dispatch(setUser(null));
-      dispatch(setError(null)); // clear any existing errors
+      dispatch(authSlice.actions.setUser(null));
+      dispatch(authSlice.actions.setError(null));
       
       // Get existing guest session or create new one
       let guestSession = localStorage.getItem('guestSession');
@@ -360,18 +360,18 @@ export default function UserMenu() {
       // Sign out from Supabase
       await supabase.auth.signOut();
       // Clear user state in Redux and reset any error
-      const userAction = setUser(null);
-      dispatch(userAction);
-      const errorAction = setError(null);
-      dispatch(errorAction);
+      dispatch(authSlice.actions.setUser(null));
+      dispatch(authSlice.actions.setError(null));
       // Open the sign-in modal, ensuring the Google sign-in button is visible
       setShowSignInModal(true);
+
+      
       // Close the switch user modal if it's open
       setShowSwitchUserModal(false);
       console.log('User signed out successfully, ready to sign in again.');
     } catch (error: any) {
       console.error('Error switching user:', error.message);
-      dispatch(setError(error.message));
+      dispatch(authSlice.actions.setError(error.message));
     } finally {
       console.groupEnd();
     }

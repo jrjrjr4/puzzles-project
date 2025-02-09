@@ -14,11 +14,8 @@ interface RatingWithDeviation {
 }
 
 interface RatingUpdate {
-  oldRating: number;
   newRating: number;
-  oldRD: number;
   newRD: number;
-  change: number;
   attempts: number;
 }
 
@@ -59,13 +56,13 @@ const initialState: PuzzleState = {
 };
 
 // Type guard function
-function isRatingUpdate(value: unknown): value is RatingUpdate {
+function isRatingUpdate(update: unknown): update is RatingUpdate {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'newRating' in value &&
-    'newRD' in value &&
-    'attempts' in value
+    typeof update === 'object' &&
+    update !== null &&
+    'newRating' in update &&
+    'newRD' in update &&
+    'attempts' in update
   );
 }
 
@@ -536,10 +533,14 @@ export const saveRatingsToSupabase = createAsyncThunk(
           categories: Object.fromEntries(
             Object.entries(updates.categories).map(([category, update]) => [
               category,
-              {
+              isRatingUpdate(update) ? {
                 rating: update.newRating,
                 ratingDeviation: update.newRD,
                 attempts: update.attempts
+              } : {
+                rating: 1600,
+                ratingDeviation: 350,
+                attempts: 0
               }
             ])
           )

@@ -129,11 +129,13 @@ const authSlice = createSlice({
       debugLog('Setting auth initialized:', action.payload);
       state.authInitialized = action.payload;
     },
-  },
+  }
 });
+
+export const { setUser, setLoading, setError, setAuthInitialized } = authSlice.actions;
+export { authSlice };
 
 // Check storage access on module load
 debugLog('Checking storage access:', checkStorageAccess());
 
-export const { setUser, setLoading, setError, setAuthInitialized } = authSlice.actions;
 export default authSlice.reducer;
