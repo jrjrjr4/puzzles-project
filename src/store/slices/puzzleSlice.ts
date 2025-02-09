@@ -105,16 +105,20 @@ const puzzleSlice = createSlice({
       const end = performance.now();
       console.log('puzzleStateUpdate:', end - start, 'ms');
     },
-    updateRatingsInStore: (state, action: PayloadAction<{
-      userRatings: PuzzleState['userRatings'];
-      lastRatingUpdates: PuzzleState['lastRatingUpdates'];
-    }>) => {
-      state.userRatings = action.payload.userRatings;
-      state.lastRatingUpdates = action.payload.lastRatingUpdates;
-      // Store the themes and ID from the puzzle that was just completed
-      const previousPuzzleThemes = state.currentPuzzle?.themes || [];
-      state.lastUpdatedThemes = previousPuzzleThemes;
-      state.previousPuzzleId = state.currentPuzzle?.id || null;
+    updateRatingsInStore: (state, action: PayloadAction<PuzzleState['userRatings']>) => {
+      state.userRatings = action.payload;
+      // For guest users, update localStorage if a guest session exists:
+      const guestSessionStr = localStorage.getItem('guestSession');
+      if (guestSessionStr) {
+        try {
+          const guestSession = JSON.parse(guestSessionStr);
+          guestSession.ratings = action.payload;
+          localStorage.setItem('guestSession', JSON.stringify(guestSession));
+          console.log('Updated guest session with new ratings.');
+        } catch (e) {
+          console.error('Error updating guest session:', e);
+        }
+      }
     },
     loadLastPuzzle: (state) => {
       // This is now just a placeholder - actual loading happens in the thunk
@@ -471,10 +475,7 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
       };
 
       // Update the store
-      dispatch(updateRatingsInStore({
-        userRatings: newRatings,
-        lastRatingUpdates: updates
-      }));
+      dispatch(updateRatingsInStore(newRatings));
 
       // Save to localStorage for all users as backup
       try {
@@ -561,3 +562,13 @@ export const saveRatingsToSupabase = createAsyncThunk(
     }
   }
 );
+
+function updateGuestSessionRatings(newRatings: any) {
+  const storedSession = localStorage.getItem('guestSession');
+  if (storedSession) {
+    const session = JSON.parse(storedSession);
+    session.ratings = newRatings;
+    localStorage.setItem('guestSession', JSON.stringify(session));
+    console.log('Updated guest session with new ratings.');
+  }
+}

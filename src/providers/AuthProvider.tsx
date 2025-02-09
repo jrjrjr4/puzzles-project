@@ -6,46 +6,70 @@ import { setUser, setLoading, setError } from '../store/slices/authSlice';
 import { fetchUserRatings, loadUserRatings, setCurrentPuzzle } from '../store/slices/puzzleSlice';
 import { AppDispatch } from '../store/store';
 
-const GUEST_SESSION_KEY = 'guestSession';
-
 interface GuestSession {
   guestId: string;
   ratings: {
     overall: { rating: number; ratingDeviation: number };
-    categories: Record<string, { 
-      rating: number; 
-      ratingDeviation: number;
-      attempts: number;
-    }>;
+    categories: Record<
+      string,
+      { rating: number; ratingDeviation: number; attempts: number }
+    >;
   };
   lastPuzzleState: any;
   solvedPuzzles: string[];
 }
 
-const createGuestSession = (): GuestSession => {
-  const defaultRating = { rating: 1600, ratingDeviation: 350, attempts: 0 };
-  const defaultCategories: Record<string, typeof defaultRating> = {
-    'Mate': { ...defaultRating },
-    'Fork': { ...defaultRating },
-    'Pin': { ...defaultRating },
-    'Defense': { ...defaultRating },
-    'Endgame': { ...defaultRating },
-    'Deflection': { ...defaultRating },
-    'Quiet Move': { ...defaultRating },
-    'Kingside Attack': { ...defaultRating },
-    'Discovered Attack': { ...defaultRating },
-    'Capturing Defender': { ...defaultRating }
-  };
+const GUEST_SESSION_KEY = 'guestSession';
 
-  return {
-    guestId: `guest_${Math.random().toString(36).substring(2, 15)}`,
-    ratings: {
-      overall: { rating: 1600, ratingDeviation: 350 },
-      categories: defaultCategories
-    },
-    lastPuzzleState: null,
-    solvedPuzzles: []
-  };
+const setupGuestSession = async (dispatch: AppDispatch) => {
+  const storedSession = localStorage.getItem(GUEST_SESSION_KEY);
+  if (storedSession) {
+    const session: GuestSession = JSON.parse(storedSession);
+    console.log('Using existing guest session:', session.guestId);
+    dispatch(loadUserRatings({ ratings: session.ratings }));
+    dispatch(
+      setUser({
+        id: session.guestId,
+        email: null,
+        isGuest: true,
+        user_metadata: {}
+      })
+    );
+    dispatch(setCurrentPuzzle(null));
+  } else {
+    const newSession: GuestSession = {
+      guestId: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      ratings: {
+        overall: { rating: 1600, ratingDeviation: 350 },
+        categories: {
+          'Mate': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Fork': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Pin': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Defense': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Endgame': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Deflection': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Quiet Move': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Kingside Attack': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Discovered Attack': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+          'Capturing Defender': { rating: 1600, ratingDeviation: 350, attempts: 0 },
+        }
+      },
+      lastPuzzleState: null,
+      solvedPuzzles: []
+    };
+    localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(newSession));
+    console.log('Created new guest session:', newSession.guestId);
+    dispatch(loadUserRatings({ ratings: newSession.ratings }));
+    dispatch(
+      setUser({
+        id: newSession.guestId,
+        email: null,
+        isGuest: true,
+        user_metadata: {}
+      })
+    );
+    dispatch(setCurrentPuzzle(null));
+  }
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -53,26 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const ratingsLoaded = useRef(false);
   const authStateChangeEnabled = useRef(false);
   const lastUserId = useRef<string | null>(null);
-
-  const setupGuestSession = async () => {
-    const newGuestSession = createGuestSession();
-    const guestUser = {
-      id: newGuestSession.guestId,
-      email: undefined,
-      user_metadata: { is_guest: true },
-      app_metadata: {},
-      aud: 'guest',
-      created_at: new Date().toISOString(),
-      role: 'authenticated',
-      updated_at: new Date().toISOString()
-    };
-    
-    dispatch(loadUserRatings({ ratings: newGuestSession.ratings }));
-    dispatch(setUser(guestUser));
-    lastUserId.current = guestUser.id;
-    ratingsLoaded.current = true;
-    dispatch(setCurrentPuzzle(null));
-  };
 
   const loadRatings = async (session: Session | null) => {
     const isGuest = !session?.user || session.user.user_metadata?.is_guest;
@@ -90,11 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastUserId.current = session.user.id;
         dispatch(setCurrentPuzzle(null));
       } else {
-        await setupGuestSession();
+        await setupGuestSession(dispatch);
+        ratingsLoaded.current = true;
       }
     } catch (error) {
       console.error('Error loading ratings:', error);
-      await setupGuestSession();
+      await setupGuestSession(dispatch);
+      ratingsLoaded.current = true;
     }
   };
 
@@ -116,12 +122,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dispatch(setUser(session.user));
           await loadRatings(session);
         } else {
-          await setupGuestSession();
+          await setupGuestSession(dispatch);
         }
 
       } catch (error) {
         console.error('Auth initialization error:', error);
-        await setupGuestSession();
+        await setupGuestSession(dispatch);
       } finally {
         if (mounted) {
           authStateChangeEnabled.current = true;
@@ -141,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch(setUser(session.user));
         await loadRatings(session);
       } else if (event === 'SIGNED_OUT') {
-        await setupGuestSession();
+        await setupGuestSession(dispatch);
       }
     });
 
@@ -150,6 +156,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [dispatch]);
+
+  const updateGuestRatings = (newRatings: any) => {
+    const storedSession = localStorage.getItem(GUEST_SESSION_KEY);
+    if (storedSession) {
+      const session = JSON.parse(storedSession);
+      session.ratings = newRatings;
+      localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(session));
+      console.log('Updated guest session with new ratings.');
+    }
+  };
 
   return <>{children}</>;
 } 
