@@ -73,26 +73,25 @@ const puzzleSlice = createSlice({
     setCurrentPuzzle: (state, action: PayloadAction<PuzzleState['currentPuzzle']>) => {
       const start = performance.now();
       
-      // Skip state update if we're setting null puzzle during initialization
-      if (!action.payload && !state.currentPuzzle) {
-        console.log('🔄 Skipping null puzzle update during initialization');
+      // Skip redundant updates to avoid unnecessary re-renders
+      if (state.currentPuzzle && action.payload && state.currentPuzzle.id === action.payload.id) {
         return;
       }
 
       // Only log warning if we're explicitly setting null when we had a puzzle
       if (!action.payload && state.currentPuzzle) {
-        console.warn('⚠️ Setting null puzzle when we had a puzzle');
+        // console.warn('⚠️ Setting null puzzle when we had a puzzle');
       }
 
-      console.log('🧩 [PuzzleSlice] Setting Current Puzzle');
-      if (action.payload) {
-        console.log('State transition:', {
-          from: state.currentPuzzle?.id,
-          to: action.payload.id,
-          themes: action.payload.themes,
-          rating: action.payload.rating
-        });
-      }
+      // console.log('🧩 [PuzzleSlice] Setting Current Puzzle');
+      // if (action.payload) {
+      //   console.log('State transition:', {
+      //     from: state.currentPuzzle?.id,
+      //     to: action.payload.id,
+      //     themes: action.payload.themes,
+      //     rating: action.payload.rating
+      //   });
+      // }
 
       // Store the previous puzzle ID before updating
       if (state.currentPuzzle) {
@@ -101,8 +100,8 @@ const puzzleSlice = createSlice({
       
       state.currentPuzzle = action.payload;
       
-      const end = performance.now();
-      console.log('puzzleStateUpdate:', end - start, 'ms');
+      // const end = performance.now();
+      // console.log('puzzleStateUpdate:', end - start, 'ms');
     },
     updateRatingsInStore: (state, action: PayloadAction<PuzzleState['userRatings']>) => {
       state.userRatings = action.payload;
@@ -113,21 +112,17 @@ const puzzleSlice = createSlice({
           const guestSession = JSON.parse(guestSessionStr);
           guestSession.ratings = action.payload;
           localStorage.setItem('guestSession', JSON.stringify(guestSession));
-          console.log('Updated guest session with new ratings.');
+          // console.log('Updated guest session with new ratings.');
         } catch (e) {
           console.error('Error updating guest session:', e);
         }
       }
     },
-    loadLastPuzzle: (state) => {
-      // This is now just a placeholder - actual loading happens in the thunk
-      console.log('Loading last puzzle from state');
-    },
     loadUserRatings: (state, action: PayloadAction<{ ratings: any }>) => {
-      console.log('Loading user ratings:', JSON.stringify(action.payload.ratings, null, 2));
+      // console.log('Loading user ratings:', JSON.stringify(action.payload.ratings, null, 2));
       
       // Create default ratings for all categories
-      const defaultRating = { rating: 1200, ratingDeviation: BASE_RD, attempts: 0 };
+      const defaultRating = { rating: 1600, ratingDeviation: BASE_RD, attempts: 0 };
       const defaultCategories: Record<string, RatingWithDeviation> = {};
       categories.forEach((c: { name: string }) => {
         defaultCategories[c.name] = { ...defaultRating };
@@ -138,14 +133,24 @@ const puzzleSlice = createSlice({
         categories: defaultCategories
       };
 
+      // Important: Create a merged object that preserves existing ratings
+      // This prevents categories from being reset to default values
+      const mergedCategories = { ...defaultCategories };
+      
+      // Only override with ratings from payload if they exist
+      if (action.payload.ratings && action.payload.ratings.categories) {
+        Object.entries(action.payload.ratings.categories).forEach(([category, value]) => {
+          if (value && typeof (value as any).rating === 'number') {
+            mergedCategories[category] = value as RatingWithDeviation;
+          }
+        });
+      }
+
       // Ensure we have valid ratings object with all required properties
       const newRatings = {
         loaded: true,
         overall: action.payload.ratings.overall || defaultRatings.overall,
-        categories: {
-          ...defaultCategories,  // Start with default ratings for all categories
-          ...action.payload.ratings.categories  // Override with any existing ratings
-        }
+        categories: mergedCategories  // Use merged categories that preserves existing values
       };
 
       // Update state
@@ -154,12 +159,12 @@ const puzzleSlice = createSlice({
       // Also save to localStorage as backup
       try {
         localStorage.setItem('chess_puzzle_ratings', JSON.stringify(newRatings));
-        console.log('✅ Saved ratings to localStorage');
+        // console.log('✅ Saved ratings to localStorage');
       } catch (err) {
-        console.error('❌ Failed to save to localStorage:', err);
+        // console.error('❌ Failed to save to localStorage:', err);
       }
       
-      console.groupEnd();
+      // console.groupEnd();
     },
     startPuzzle: (state) => {
       if (!state.currentPuzzle) return;
@@ -181,17 +186,17 @@ const puzzleSlice = createSlice({
   }
 });
 
-export const { setCurrentPuzzle, updateRatingsInStore, loadUserRatings, loadLastPuzzle } = puzzleSlice.actions;
+export const { setCurrentPuzzle, updateRatingsInStore, loadUserRatings, startPuzzle } = puzzleSlice.actions;
 export default puzzleSlice.reducer;
 
 // Add async thunk to save current puzzle
 export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPuzzle']) => async () => {
   if (!puzzle) {
-    console.log('No puzzle to save');
+    // console.log('No puzzle to save');
     return;
   }
 
-  console.log('Saving current puzzle:', puzzle.id, 'for user:', userId);
+  // console.log('Saving current puzzle:', puzzle.id, 'for user:', userId);
 
   // Check if this is a guest user by userId prefix
   const isGuest = userId?.startsWith('guest_') || userId === '558bb524-a3ba-4ecc-9a8a-158c13c5cb58';
@@ -200,7 +205,7 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
     try {
       // Save to guest-specific localStorage
       localStorage.setItem(`guest_last_puzzle_${userId}`, JSON.stringify(puzzle));
-      console.log('💾 Saved last puzzle to guest localStorage');
+      // console.log('💾 Saved last puzzle to guest localStorage');
       
       // Also update the guest session
       const guestSession = localStorage.getItem('guestSession');
@@ -208,7 +213,7 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
         const session = JSON.parse(guestSession);
         session.lastPuzzleState = puzzle;
         localStorage.setItem('guestSession', JSON.stringify(session));
-        console.log('💾 Updated guest session with last puzzle');
+        // console.log('💾 Updated guest session with last puzzle');
       }
     } catch (err) {
       console.error('❌ Failed to save guest puzzle to localStorage:', err);
@@ -250,7 +255,7 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
     if (error) {
       console.error('❌ Error saving current puzzle:', error);
     } else {
-      console.log('✅ Successfully saved current puzzle to Supabase');
+      // console.log('✅ Successfully saved current puzzle to Supabase');
     }
   } catch (error) {
     console.error('❌ Error in saveCurrentPuzzle:', error);
@@ -259,8 +264,8 @@ export const saveCurrentPuzzle = (userId: string, puzzle: PuzzleState['currentPu
 
 // Add async thunk to fetch user ratings
 export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
-  console.group('🔄 Fetching User Ratings');
-  console.log('Fetching ratings for user:', userId);
+  // console.group('🔄 Fetching User Ratings');
+  // console.log('Fetching ratings for user:', userId);
   
   // Check if this is a guest user by userId prefix - no need to check Supabase
   const isGuest = userId.startsWith('guest_');
@@ -268,10 +273,38 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
   if (isGuest) {
     // For guest users, load from localStorage
     try {
+      // First try to get from localStorage backup
+      const backupRatingsJson = localStorage.getItem('chess_puzzle_ratings');
+      let existingRatings = null;
+      
+      if (backupRatingsJson) {
+        try {
+          existingRatings = JSON.parse(backupRatingsJson);
+        } catch (e) {
+          console.error('Error parsing backup ratings:', e);
+        }
+      }
+      
+      // Then check the guest session
       const guestSession = localStorage.getItem('guestSession');
       if (guestSession) {
         const session = JSON.parse(guestSession);
-        console.log('✅ Loaded guest ratings from localStorage:', session.ratings);
+        // console.log('✅ Loaded guest ratings from localStorage:', session.ratings);
+        
+        // If we have backup ratings, merge them with the session ratings to prevent data loss
+        if (existingRatings && existingRatings.categories) {
+          if (!session.ratings.categories) {
+            session.ratings.categories = {};
+          }
+          
+          // Merge any categories from backup that don't exist in session
+          Object.entries(existingRatings.categories).forEach(([category, data]) => {
+            if (!session.ratings.categories[category]) {
+              session.ratings.categories[category] = data;
+            }
+          });
+        }
+        
         dispatch(loadUserRatings({ ratings: session.ratings }));
       } else {
         // Create default ratings for guest
@@ -289,17 +322,22 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
           'Capturing Defender': { ...defaultRating }
         };
         
-        const defaultRatings = {
-          overall: { rating: 1600, ratingDeviation: 350 },
-          categories: defaultCategories
-        };
-        
-        dispatch(loadUserRatings({ ratings: defaultRatings }));
+        // If we have backup ratings, use those instead of defaults
+        if (existingRatings) {
+          dispatch(loadUserRatings({ ratings: existingRatings }));
+        } else {
+          const defaultRatings = {
+            overall: { rating: 1600, ratingDeviation: 350 },
+            categories: defaultCategories
+          };
+          
+          dispatch(loadUserRatings({ ratings: defaultRatings }));
+        }
       }
     } catch (err) {
       console.error('❌ Error loading guest ratings:', err);
     }
-    console.groupEnd();
+    // console.groupEnd();
     return;
   }
 
@@ -322,21 +360,21 @@ export const fetchUserRatings = (userId: string) => async (dispatch: any) => {
     }
 
     if (data?.ratings) {
-      console.log('✅ Successfully loaded ratings from Supabase:', data.ratings);
+      // console.log('✅ Successfully loaded ratings from Supabase:', data.ratings);
       dispatch(loadUserRatings({ ratings: data.ratings }));
     } else {
-      console.log('ℹ️ No existing ratings found for user');
+      // console.log('ℹ️ No existing ratings found for user');
     }
   } catch (err) {
     console.error('❌ Error in fetchUserRatings:', err);
   } finally {
-    console.groupEnd();
+    // console.groupEnd();
   }
 };
 
 // Add async thunk to fetch last puzzle
 export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
-  console.log('Fetching last puzzle for user:', userId);
+  // console.log('Fetching last puzzle for user:', userId);
 
   try {
     // Check if this is a guest user by userId prefix or specific ID
@@ -356,11 +394,11 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
       }
 
       if (puzzle) {
-        console.log('✅ Loaded last puzzle from guest storage:', puzzle);
+        // console.log('✅ Loaded last puzzle from guest storage:', puzzle);
         dispatch(setCurrentPuzzle(puzzle));
         return;
       } else {
-        console.log('No saved puzzle found for guest user');
+        // console.log('No saved puzzle found for guest user');
         dispatch(setCurrentPuzzle(null));
         return;
       }
@@ -380,10 +418,10 @@ export const fetchLastPuzzle = (userId: string) => async (dispatch: any) => {
     }
 
     if (data?.last_puzzle) {
-      console.log('📖 Loaded last puzzle from Supabase:', data.last_puzzle);
+      // console.log('📖 Loaded last puzzle from Supabase:', data.last_puzzle);
       dispatch(setCurrentPuzzle(data.last_puzzle));
     } else {
-      console.log('No last puzzle found');
+      // console.log('No last puzzle found');
       dispatch(setCurrentPuzzle(null));
     }
   } catch (error) {
@@ -406,11 +444,11 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
 
     try {
       const score = success ? 1 : 0;
-      console.log('Puzzle details:', {
-        id: currentPuzzle.id,
-        rating: currentPuzzle.rating,
-        themes: currentPuzzle.themes
-      });
+      // console.log('Puzzle details:', {
+      //   id: currentPuzzle.id,
+      //   rating: currentPuzzle.rating,
+      //   themes: currentPuzzle.themes
+      // });
       
       const categoriesToUpdate = currentPuzzle.themes.length > 0 
         ? currentPuzzle.themes.map(theme => {
@@ -434,7 +472,7 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
       for (const category of categoriesToUpdate) {
         if (!category) continue;
         
-        console.log(`Processing category: ${category}`);
+        // console.log(`Processing category: ${category}`);
         
         const categoryRating = userRatings.categories[category] || {
           rating: 1600,
@@ -451,12 +489,12 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
           categoryRating.attempts
         );
 
-        console.log(`Category ${category} rating update:`, {
-          old: categoryRating.rating,
-          new: categoryUpdates[category].newRating,
-          change: categoryUpdates[category].newRating - categoryRating.rating,
-          attempts: categoryUpdates[category].attempts
-        });
+        // console.log(`Category ${category} rating update:`, {
+        //   old: categoryRating.rating,
+        //   new: categoryUpdates[category].newRating,
+        //   change: categoryUpdates[category].newRating - categoryRating.rating,
+        //   attempts: categoryUpdates[category].attempts
+        // });
       }
 
       // Create new ratings object
@@ -490,9 +528,14 @@ export const updateRatingsAfterPuzzleAsync = createAsyncThunk(
       // Save to localStorage for all users as backup
       try {
         localStorage.setItem('chess_puzzle_ratings', JSON.stringify(newRatings));
-        console.log('💾 Successfully saved to localStorage');
+        // console.log('💾 Successfully saved to localStorage');
       } catch (err) {
         console.error('❌ Failed to save to localStorage:', err);
+      }
+
+      // Save ratings to Supabase if we have a userId
+      if (userId) {
+        await dispatch(saveRatingsToSupabase({ userId, ratings: newRatings, updates }));
       }
 
       return {
@@ -512,7 +555,7 @@ export const saveRatingsToSupabase = createAsyncThunk(
   async ({ userId, ratings, updates }: { userId: string; ratings: any; updates: any }) => {
     if (!userId || userId.startsWith('guest_')) return;
 
-    console.log('🔄 Saving to Supabase for user:', userId);
+    // console.log('🔄 Saving to Supabase for user:', userId);
     
     try {
       // First check if record exists
@@ -568,7 +611,7 @@ export const saveRatingsToSupabase = createAsyncThunk(
         console.error('❌ Error saving ratings to Supabase:', error);
         throw error;
       } else {
-        console.log('✅ Successfully saved ratings to Supabase');
+        // console.log('✅ Successfully saved ratings to Supabase');
       }
     } catch (err) {
       console.error('❌ Error saving to Supabase:', err);
@@ -583,6 +626,6 @@ function updateGuestSessionRatings(newRatings: any) {
     const session = JSON.parse(storedSession);
     session.ratings = newRatings;
     localStorage.setItem('guestSession', JSON.stringify(session));
-    console.log('Updated guest session with new ratings.');
+    // console.log('Updated guest session with new ratings.');
   }
 }

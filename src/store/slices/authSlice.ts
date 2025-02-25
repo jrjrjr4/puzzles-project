@@ -18,9 +18,10 @@ const initialState: AuthState = {
 
 const AUTH_TIMEOUT = 15000; // 15 seconds timeout
 
-// Debug logger
+// Debug logger - disabled
 const debugLog = (message: string, data?: any) => {
-  console.log(`🔐 Auth Debug: ${message}`, data ? data : '');
+  // Console logs disabled
+  // console.log(`🔐 Auth Debug: ${message}`, data ? data : '');
 };
 
 export const signInWithGoogle = createAsyncThunk(

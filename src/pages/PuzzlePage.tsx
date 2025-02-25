@@ -24,7 +24,7 @@ export default function PuzzlePage() {
               <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <h2 className="text-lg font-medium mb-3 sm:mb-4">Rating Updates:</h2>
                 <div className="space-y-2">
-                  {Object.entries(lastRatingUpdates.categories).map(([category, update]) => (
+                  {Object.entries(lastRatingUpdates.categories || {}).map(([category, update]) => (
                     <div key={category} className="flex justify-between text-sm sm:text-base">
                       <span>{category}:</span>
                       <span>
@@ -39,7 +39,7 @@ export default function PuzzlePage() {
             )}
 
             {/* Categories/Ratings component */}
-            <CategoryRatings />
+            <CategoryRatings lastRatingUpdates={lastRatingUpdates} />
           </div>
         </div>
       </div>

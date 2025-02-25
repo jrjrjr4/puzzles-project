@@ -1,25 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Chessboard from './Chessboard';
+import ChessBoardWrapper from './ChessBoardWrapper';
 import CategoryRatings from './CategoryRatings';
 import PuzzleInfo from './PuzzleInfo';
 import { parsePuzzleCsv } from '../utils/puzzles';
-import { setCurrentPuzzle, loadLastPuzzle, saveCurrentPuzzle, fetchLastPuzzle, updateRatingsAfterPuzzleAsync } from '../store/slices/puzzleSlice';
+import { setCurrentPuzzle, saveCurrentPuzzle, fetchLastPuzzle, updateRatingsAfterPuzzleAsync } from '../store/slices/puzzleSlice';
 import { getNextPuzzle } from '../utils/puzzleSelector';
 import { RootState, AppDispatch, store } from '../store/store';
 import { Puzzle } from '../types/puzzle';
+
+// Define the structure of currentPuzzle from Redux store
+interface CurrentPuzzleType {
+  id: string;
+  fen: string;
+  moves: string[];
+  rating: number;
+  ratingDeviation: number;
+  themes: string[];
+}
+
+// Helper function to safely check if a puzzle has an ID
+function hasPuzzleId(puzzle: any): puzzle is CurrentPuzzleType {
+  return puzzle !== null && 
+         typeof puzzle === 'object' && 
+         'id' in puzzle && 
+         typeof puzzle.id === 'string';
+}
+
+// Safe accessor function for puzzle ID
+function getPuzzleId(puzzle: any): string | undefined {
+  return hasPuzzleId(puzzle) ? puzzle.id : undefined;
+}
 
 export default function GameSection() {
   const dispatch = useDispatch<AppDispatch>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
-  const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+  const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle) as CurrentPuzzleType | null;
   const lastRatingUpdates = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAuthLoading = useSelector((state: RootState) => state.auth.loading);
+  const authInitialized = useSelector((state: RootState) => state.auth.authInitialized);
   const [usedPuzzleIds] = useState<Set<string>>(new Set());
-  const [rightPanelWidth] = useState(520);
   const [boardSize, setBoardSize] = useState(0);
   const isDragging = useRef(false);
   const startY = useRef(0);
@@ -30,48 +53,241 @@ export default function GameSection() {
   const isInitializing = useRef(false);
   const isLoadingPuzzle = useRef(false);
   const lastUserId = useRef<string | null>(null);
-  const [cachedPuzzles, setCachedPuzzles] = useState<ReturnType<typeof parsePuzzleCsv>>([]);
+  const [cachedPuzzles, setCachedPuzzles] = useState<Puzzle[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout>();
-  const [precomputedNextPuzzle, setPrecomputedNextPuzzle] = useState<ReturnType<typeof parsePuzzleCsv>[0] | null>(null);
-  const [previousPuzzle, setPreviousPuzzle] = useState<ReturnType<typeof parsePuzzleCsv>[0] | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  // Add performance measurement
-  const transitionStartTime = useRef<number | null>(null);
-
-  // Add transition handling
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTransitioningBoard, setIsTransitioningBoard] = useState(false);
-  const transitionTimeoutRef = useRef<NodeJS.Timeout>();
-
-  // Effect to log state changes
-  useEffect(() => {
-    console.group('🔄 [GameSection] State Update');
-    console.log('Current Puzzle:', currentPuzzle?.id);
-    console.log('Is Loading:', isLoading);
-    console.log('Is Transitioning:', isTransitioning);
-    console.log('Precomputed Next:', precomputedNextPuzzle?.id);
-    console.log('Previous Puzzle:', previousPuzzle?.id);
-    if (transitionStartTime.current) {
-      console.log('Transition Time:', Date.now() - transitionStartTime.current, 'ms');
+  const [loadingMessage, setLoadingMessage] = useState('Loading...');
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const debugRef = useRef({ initialized: false, lastContainerWidth: 0 });
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const precomputedNextPuzzle = useRef<Puzzle | null>(null);
+  const [shouldResetPuzzle, setShouldResetPuzzle] = useState(false);
+  
+  // Debug function to track board size calculation
+  const debugLog = (message: string) => {
+    // Only log critical messages in production, more verbose in development
+    if (process.env.NODE_ENV === 'development' && false) { // Disabled even in development
+      console.log(`📏 [BoardSize] ${message}`);
     }
-    console.groupEnd();
-  }, [currentPuzzle, isLoading, isTransitioning, precomputedNextPuzzle, previousPuzzle]);
+  };
 
-  // Effect to precompute next puzzle when ratings are updated
-  useEffect(() => {
-    if (lastRatingUpdates && cachedPuzzles.length > 0) {
-      console.log('🎯 [Precompute] Computing next puzzle after ratings update');
-      const themeRatings: { [theme: string]: number } = {};
-      Object.entries(userRatings.categories).forEach(([theme, data]) => {
-        themeRatings[theme] = data.rating;
-      });
+  // Calculate and set board size based on container dimensions
+  const calculateAndSetBoardSize = () => {
+    if (!containerRef.current) {
+      debugLog('No container ref');
       
-      const nextPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
-      if (nextPuzzle) {
-        console.log('✨ [Precompute] Next puzzle ready:', nextPuzzle.id);
-        setPrecomputedNextPuzzle(nextPuzzle);
+      // Set up a retry if container ref isn't available yet
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(() => {
+          debugLog('Retrying board size calculation');
+          timerRef.current = null;
+          calculateAndSetBoardSize();
+        }, 200);
       }
+      return;
+    }
+    
+    // Get container width (accounting for padding)
+    const container = containerRef.current;
+    const containerStyle = window.getComputedStyle(container);
+    const paddingLeft = parseFloat(containerStyle.paddingLeft);
+    const paddingRight = parseFloat(containerStyle.paddingRight);
+    const containerWidth = container.clientWidth - paddingLeft - paddingRight;
+    
+    debugRef.current.lastContainerWidth = containerWidth;
+    
+    debugLog(`Container dimensions: ${containerWidth}px`);
+    
+    // Use a fallback size if container width is too small or not available
+    if (containerWidth <= 20) {
+      debugLog(`Container width too small (${containerWidth}px), using fallback sizing`);
+      
+      // Use window width as fallback with a safe margin
+      const windowWidth = Math.max(window.innerWidth - 40, 300);
+      const fallbackSize = window.innerWidth < 768 ? 
+        windowWidth : 
+        Math.min(Math.floor(windowWidth * 0.6), 600);
+      
+      debugLog(`Using fallback size: ${fallbackSize}px`);
+      
+      if (fallbackSize > 0 && fallbackSize !== boardSize) {
+        setBoardSize(fallbackSize);
+        
+        // Try again after a short delay to see if proper dimensions are available
+        if (!timerRef.current) {
+          timerRef.current = setTimeout(() => {
+            debugLog('Retrying after fallback calculation');
+            timerRef.current = null;
+            calculateAndSetBoardSize();
+          }, 500);
+        }
+      }
+      return;
+    }
+    
+    let newBoardSize: number;
+    
+    if (window.innerWidth < 768) {
+      // Mobile: Use 100% of container width
+      newBoardSize = Math.floor(containerWidth);
+      debugLog(`Mobile view, setting board size to ${newBoardSize}px`);
+    } else {
+      // Desktop: Use 80% of container width, but cap at 600px
+      newBoardSize = Math.min(Math.floor(containerWidth * 0.8), 600);
+      debugLog(`Desktop view, setting board size to ${newBoardSize}px`);
+    }
+    
+    // Only update if size has changed to avoid unnecessary re-renders
+    if (newBoardSize !== boardSize && newBoardSize > 0) {
+      debugLog(`Updating board size from ${boardSize} to ${newBoardSize}`);
+      setBoardSize(newBoardSize);
+    } else if (newBoardSize <= 0) {
+      // This is a critical error worth logging
+      console.warn(`[BoardSize] Calculated invalid board size: ${newBoardSize}px`);
+      
+      // If we calculated an invalid size, try again after a delay
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(() => {
+          debugLog('Retrying after invalid size calculation');
+          timerRef.current = null;
+          calculateAndSetBoardSize();
+        }, 300);
+      }
+    }
+  };
+  
+  // Set up ResizeObserver for container
+  useEffect(() => {
+    debugLog('Setting up ResizeObserver');
+    
+    // Initial calculation attempt
+    const initialCalculation = () => {
+      debugLog('Running initial board size calculation');
+      calculateAndSetBoardSize();
+      
+      // Make multiple attempts to ensure we get a valid size
+      // This helps in cases where layout isn't fully rendered yet
+      const attemptTimes = [100, 300, 500, 1000];
+      
+      attemptTimes.forEach(delay => {
+        setTimeout(() => {
+          if (boardSize <= 0) {
+            debugLog(`Additional calculation attempt after ${delay}ms`);
+            calculateAndSetBoardSize();
+          }
+        }, delay);
+      });
+    };
+    
+    if (typeof ResizeObserver === 'undefined') {
+      console.warn('[BoardSize] ResizeObserver not supported, using resize event fallback');
+      
+      // Calculate initial size
+      initialCalculation();
+      
+      // Add resize event listener as fallback
+      window.addEventListener('resize', calculateAndSetBoardSize);
+      return () => {
+        window.removeEventListener('resize', calculateAndSetBoardSize);
+      };
+    }
+    
+    if (!resizeObserverRef.current) {
+      resizeObserverRef.current = new ResizeObserver(entries => {
+        debugLog('ResizeObserver triggered');
+        calculateAndSetBoardSize();
+      });
+    }
+    
+    if (containerRef.current) {
+      // Start observing the container
+      resizeObserverRef.current.observe(containerRef.current);
+      debugLog('Now observing container');
+      
+      // Run initial calculation
+      initialCalculation();
+    } else {
+      // If containerRef isn't available yet, set up a retry
+      debugLog('Container ref not available, setting up retry');
+      const retryTimeout = setTimeout(() => {
+        debugLog('Retrying observer setup');
+        if (containerRef.current && resizeObserverRef.current) {
+          resizeObserverRef.current.observe(containerRef.current);
+          initialCalculation();
+        }
+      }, 200);
+      
+      return () => {
+        clearTimeout(retryTimeout);
+      };
+    }
+    
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        debugLog('Disconnected ResizeObserver');
+      }
+      
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Calculate board size as early as possible in the render cycle
+  useEffect(() => {
+    // Only log significant board size changes
+    if (boardSize > 0) {
+      debugLog(`boardSize state updated to ${boardSize}px`);
+    }
+  }, [boardSize]);
+
+  // Use useLayoutEffect to calculate the board size before the painting phase
+  useLayoutEffect(() => {
+    debugLog('Running layout effect for initial size calculation');
+    
+    // Immediately try to calculate the board size
+    calculateAndSetBoardSize();
+    
+    // Set a backup timer with a very short delay
+    const immediateTimer = setTimeout(() => {
+      if (boardSize <= 0) {
+        debugLog('Immediate layout effect retry');
+        calculateAndSetBoardSize();
+      }
+    }, 50);
+    
+    return () => clearTimeout(immediateTimer);
+  }, []);
+
+  // Precompute the next puzzle before it's needed
+  useEffect(() => {
+    if (!userRatings?.categories || !cachedPuzzles.length || isLoading || !lastRatingUpdates) return;
+    
+    // Only precompute if we haven't already or the ratings have changed
+    if (precomputedNextPuzzle.current) return;
+    
+    // Create formatted theme ratings object for getNextPuzzle function
+    const themeRatings: Record<string, number> = {};
+    
+    // Add all category ratings to the theme ratings
+    Object.entries(userRatings.categories).forEach(([category, rating]) => {
+      themeRatings[category] = typeof rating === 'number' ? rating : 1500;
+    });
+    
+    // Only keep puzzles not already used
+    const availablePuzzles = cachedPuzzles.filter(puzzle => 
+      puzzle && puzzle.id && !usedPuzzleIds.has(puzzle.id)
+    );
+    
+    // Get a precomputed puzzle
+    precomputedNextPuzzle.current = getNextPuzzle(themeRatings, availablePuzzles, usedPuzzleIds);
+    
+    // Only log in development
+    if (process.env.NODE_ENV === 'development' && false) { // Disabled even in development
+      console.log('🧩 Precomputed next puzzle:', precomputedNextPuzzle.current?.id);
     }
   }, [lastRatingUpdates, cachedPuzzles, userRatings.categories, usedPuzzleIds]);
 
@@ -79,427 +295,375 @@ export default function GameSection() {
   useEffect(() => {
     async function loadPuzzles() {
       try {
+        setLoadingMessage('Fetching puzzle database...');
         const response = await fetch('/filtered_puzzles.csv');
         if (!response.ok) {
           throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
         }
+        
+        setLoadingMessage('Processing puzzles...');
         const csvContent = await response.text();
         const puzzles = parsePuzzleCsv(csvContent);
         setCachedPuzzles(puzzles);
+        // Critical info worth keeping in a minimal form
+        if (process.env.NODE_ENV === 'development') {
+          // Disable verbose logging
+          // console.log(`📚 Loaded ${puzzles.length} puzzles from CSV`);
+        }
         
         // If we're a guest user with no puzzle, load one now that we have puzzles
-        if (user?.user_metadata?.is_guest && !currentPuzzle && !isInitializing.current) {
-          console.log('🎲 [Load] Guest user detected, loading initial puzzle');
+        if (user?.user_metadata?.is_guest && !currentPuzzle && !isInitializing.current && authInitialized) {
+          // Disable debug logging
+          // console.log('🎲 [Load] Guest user detected, loading initial puzzle');
           loadNextPuzzle();
         }
       } catch (error) {
-        console.error('Failed to load puzzles:', error);
+        console.error('❌ Failed to load puzzles:', error);
         setError(error instanceof Error ? error.message : 'Failed to load puzzles');
       } finally {
         setIsInitialLoad(false);
       }
     }
+    
     loadPuzzles();
   }, []);
 
-  // Modified initialization logic to check for cached puzzles
+  // Handle puzzle initialization based on auth state
   useEffect(() => {
-    let mounted = true;
-    console.log('🔄 [Mount] GameSection mounting with user:', user?.id);
-    console.log('📊 [Mount] Current puzzle state:', currentPuzzle?.id);
-    console.log('🔒 [Mount] isInitializing:', isInitializing.current);
-    console.log('🏷️ [Mount] lastUserId:', lastUserId.current);
-    console.log('📚 [Mount] Cached puzzles:', cachedPuzzles.length);
-
-    // Skip initialization if we don't have puzzles yet
-    if (cachedPuzzles.length === 0) {
-      console.log('⏳ [Mount] Skipping initialization - No puzzles yet');
+    // Only proceed once auth is initialized and puzzles are loaded
+    if (!authInitialized || cachedPuzzles.length === 0) {
       return;
     }
-
-    // Reset initialization state on mount if we don't have a puzzle
-    if (!currentPuzzle) {
-      isInitializing.current = false;
-    }
-
-    async function initializePuzzle() {
-      console.log('⏳ [Initialize] Starting initialization check');
-      console.log('👤 [Initialize] Current user:', user?.id);
-      console.log('🎯 [Initialize] Current puzzle:', currentPuzzle?.id);
-      
-      // Skip if already initializing
-      if (isInitializing.current) {
-        console.log('⚠️ [Initialize] Skipping - Already initializing');
+    
+    let mounted = true;
+    // console.log('🎮 [GameSection] Auth initialized, checking puzzle state');
+    
+    const initializeGameState = async () => {
+      // Don't initialize if we already have a current puzzle
+      if (hasPuzzleId(currentPuzzle)) {
+        // console.log('✅ [GameSection] Using persisted puzzle:', getPuzzleId(currentPuzzle));
         return;
       }
-
-      // Skip if component unmounted
-      if (!mounted) {
-        console.log('⚠️ [Initialize] Skipping - Component unmounted');
+      
+      // Don't initialize if already initializing
+      if (isInitializing.current) {
+        // console.log('⏳ [GameSection] Already initializing, skipping');
         return;
       }
       
       try {
-        console.log('🔄 [Initialize] Starting puzzle initialization');
+        // console.log('🔄 [GameSection] Initializing game state');
         isInitializing.current = true;
         setIsLoading(true);
+        setLoadingMessage('Getting a puzzle for you...');
         
-        // Only clear puzzle state if we're changing users
-        if (user?.id !== lastUserId.current) {
-          console.log('🧹 [Initialize] Clearing puzzle state - User changed');
-          dispatch(setCurrentPuzzle(null));
-          lastUserId.current = user?.id || null;
+        // If we have a persisted puzzle in Redux, we're done
+        if (hasPuzzleId(currentPuzzle)) {
+          // console.log('✅ [GameSection] Already have persisted puzzle:', getPuzzleId(currentPuzzle));
+          return;
         }
         
-        // Try to load the last puzzle first
-        if (user?.id) {
-          console.log('📖 [Initialize] Attempting to load last puzzle');
-          await dispatch(fetchLastPuzzle(user.id));
-          
-          // Wait a moment for state to update
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Check if we got a puzzle from storage
-          const state = store.getState();
-          const loadedPuzzle = state.puzzle.currentPuzzle;
-          
-          if (loadedPuzzle) {
-            console.log('✨ [Initialize] Successfully loaded saved puzzle:', loadedPuzzle.id);
-            setIsLoading(false);
-            isInitializing.current = false;
-            return;
-          }
-        }
+        // Load a new puzzle if we don't have one yet
+        await loadNextPuzzle();
         
-        // Only load a new puzzle if we didn't get one from storage
-        if (!currentPuzzle) {
-          console.log('🎯 [Initialize] No saved puzzle found, getting new one');
-          await loadNextPuzzle();
-        } else {
-          console.log('✨ [Initialize] Using existing puzzle:', currentPuzzle.id);
-        }
       } catch (error) {
-        console.error('❌ [Initialize] Error:', error);
-        if (mounted) {
-          setError(error instanceof Error ? error.message : 'Failed to initialize puzzle');
-        }
+        console.error('❌ [GameSection] Error initializing game state:', error);
+        setError(error instanceof Error ? error.message : 'Failed to initialize game');
       } finally {
         if (mounted) {
-          console.log('✨ [Initialize] Cleanup - Still mounted');
-          setIsLoading(false);
           isInitializing.current = false;
+          setIsLoading(false);
         }
       }
-    }
-
-    // Start initialization immediately if needed
-    if ((!currentPuzzle || user?.id !== lastUserId.current) && !isInitializing.current) {
-      initializePuzzle();
-    }
-
+    };
+    
+    // Start initialization process
+    initializeGameState();
+    
     return () => {
       mounted = false;
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
     };
-  }, [dispatch, user?.id, currentPuzzle, cachedPuzzles.length]);
+  }, [authInitialized, cachedPuzzles.length, currentPuzzle]);
 
   // Save puzzle when it changes
   useEffect(() => {
     if (!user?.id || !currentPuzzle) return;
     
     const timeoutId = setTimeout(() => {
+      // console.log('💾 [GameSection] Saving current puzzle state');
       dispatch(saveCurrentPuzzle(user.id, currentPuzzle));
     }, 100);
     
     return () => clearTimeout(timeoutId);
   }, [dispatch, user?.id, currentPuzzle]);
 
-  // Calculate initial board size and update on window resize
-  useEffect(() => {
-    const calculateBoardSize = () => {
-      if (!containerRef.current) return;
-      const containerWidth = containerRef.current.offsetWidth;
-      const isMobile = window.innerWidth < 768;
-      const maxSize = isMobile ? Math.min(containerWidth - 32, window.innerHeight - 200) : 600;
-      setBoardSize(maxSize);
-    };
-
-    // Calculate size immediately
-    calculateBoardSize();
-    
-    // Recalculate after a short delay to ensure container is properly rendered
-    const initialTimer = setTimeout(calculateBoardSize, 100);
-
-    // Add resize listener
-    window.addEventListener('resize', calculateBoardSize);
-    
-    return () => {
-      window.removeEventListener('resize', calculateBoardSize);
-      clearTimeout(initialTimer);
-    };
-  }, [currentPuzzle]); // Add currentPuzzle as dependency to recalculate when puzzle changes
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    startY.current = e.clientY;
-    startSize.current = boardSize;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const deltaY = e.clientY - startY.current;
-    const newSize = Math.max(300, Math.min(800, startSize.current + deltaY));
-    setBoardSize(newSize);
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
-
-  // Effect to handle puzzle transitions
-  useEffect(() => {
-    if (currentPuzzle?.id) {
-      setIsTransitioningBoard(true);
-      // Clear any existing transition timeout
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-      // Set a short timeout to ensure smooth transition
-      transitionTimeoutRef.current = setTimeout(() => {
-        setIsTransitioningBoard(false);
-      }, 50);
-    }
-    return () => {
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, [currentPuzzle?.id]);
-
   const loadNextPuzzle = async () => {
-    console.log('🎯 [Next] Loading next puzzle');
-    setPuzzleSolved(false); // Reset puzzle completion state
-    setPuzzleFailed(false);
-    setIsTransitioning(true);
-    setIsTransitioningBoard(true);
-    transitionStartTime.current = Date.now();
-
+    if (isLoadingPuzzle.current) {
+      // console.log('⚠️ [Load] Already loading puzzle, skipping request');
+      return;
+    }
+    
     try {
-      if (cachedPuzzles.length === 0) {
-        setError('Loading puzzles...');
-        return;
-      }
-
-      console.log('📊 [Next Puzzle] Current State:', {
-        currentPuzzleId: currentPuzzle?.id,
-        precomputedId: precomputedNextPuzzle?.id,
-        isLoading: isLoading,
-        cachedPuzzlesCount: cachedPuzzles.length
-      });
-
-      let nextPuzzle;
-
-      // For guest users' first puzzle, pick a random one
-      const isGuest = user?.user_metadata?.is_guest;
-      const isFirstPuzzle = !currentPuzzle && isGuest;
+      isLoadingPuzzle.current = true;
+      setIsLoading(true);
+      setLoadingMessage('Finding the perfect puzzle for you...');
       
-      if (isFirstPuzzle) {
-        console.log('🎲 [Next Puzzle] Selecting random puzzle for guest first time');
-        const randomIndex = Math.floor(Math.random() * Math.min(cachedPuzzles.length, 100));
-        nextPuzzle = cachedPuzzles[randomIndex];
-      } else if (precomputedNextPuzzle) {
-        console.log('✨ [Next Puzzle] Using precomputed puzzle:', precomputedNextPuzzle.id);
-        nextPuzzle = precomputedNextPuzzle;
-        setPrecomputedNextPuzzle(null);
-      } else {
-        console.log('🔄 [Next Puzzle] Computing new puzzle');
+      // Reduced debug logging
+      setIsTransitioningBoard(true);
+      
+      // Clear previous states
+      setPuzzleSolved(false);
+      setPuzzleFailed(false);
+      
+      // Short delay to allow the board transition effect
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Use precomputed puzzle if available, otherwise get a new one
+      let nextPuzzle;
+      if (precomputedNextPuzzle.current) {
+        // Keep this log as it's helpful for troubleshooting
+        // console.log('✅ [Load] Using precomputed puzzle:', precomputedNextPuzzle.current.id);
+        nextPuzzle = precomputedNextPuzzle.current;
+        precomputedNextPuzzle.current = null;
+      } else if (cachedPuzzles.length > 0) {
+        // Reduced logging
+        
+        // Create ratings object in the format expected by getNextPuzzle
         const themeRatings: { [theme: string]: number } = {};
         Object.entries(userRatings.categories).forEach(([theme, data]) => {
           themeRatings[theme] = data.rating;
         });
-        nextPuzzle = getNextPuzzle(themeRatings, cachedPuzzles, usedPuzzleIds);
+        
+        nextPuzzle = await getNextPuzzle(
+          themeRatings,
+          cachedPuzzles,
+          usedPuzzleIds
+        );
       }
-
+      
       if (!nextPuzzle) {
-        console.log('❌ [Next Puzzle] Failed to get next puzzle');
-        setError('Loading next puzzle...');
-        return;
+        console.error('❌ [Load] Failed to get next puzzle');
+        throw new Error('Failed to get next puzzle');
       }
-
-      // Clear any existing error
-      setError(null);
-
-      // Add puzzle to used set
+      
+      // Mark as used to avoid repetition
       usedPuzzleIds.add(nextPuzzle.id);
-
-      // Set previous puzzle before updating current
-      setPreviousPuzzle(currentPuzzle ? {
-        ...currentPuzzle,
-        popularity: 0,
-        nbPlays: 0,
-        gameUrl: '',
-        openingTags: []
-      } : null);
-
-      // Update the current puzzle
-      dispatch(setCurrentPuzzle(nextPuzzle));
-
-      // Start transition timeout
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-      transitionTimeoutRef.current = setTimeout(() => {
-        setIsTransitioningBoard(false);
-      }, 300);
-
+      
+      // Update Redux state
+      dispatch(setCurrentPuzzle({
+        id: nextPuzzle.id,
+        fen: nextPuzzle.fen,
+        moves: nextPuzzle.moves,
+        rating: nextPuzzle.rating,
+        ratingDeviation: nextPuzzle.ratingDeviation || 0,
+        themes: nextPuzzle.themes,
+        ...(nextPuzzle.popularity !== undefined && { popularity: nextPuzzle.popularity }),
+        ...(nextPuzzle.nbPlays !== undefined && { nbPlays: nextPuzzle.nbPlays }),
+        ...(nextPuzzle.gameUrl && { gameUrl: nextPuzzle.gameUrl }),
+        ...(nextPuzzle.openingTags && { openingTags: nextPuzzle.openingTags })
+      }));
+      
     } catch (error) {
-      console.error('❌ [Next Puzzle] Error:', error);
-      setError('Loading next puzzle...');
+      console.error('❌ [Load] Error loading puzzle:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load puzzle');
     } finally {
-      const transitionTime = Date.now() - (transitionStartTime.current || Date.now());
-      console.log('✨ [Next Puzzle] Transition complete in', transitionTime, 'ms');
-      setIsTransitioning(false);
-      transitionStartTime.current = null;
+      isLoadingPuzzle.current = false;
+      setIsLoading(false);
+      setIsTransitioningBoard(false);
     }
   };
 
   const handlePuzzleComplete = async (solved: boolean) => {
-    console.group('🎯 Puzzle Complete');
-    console.log('Result:', solved ? 'Solved ✅' : 'Failed ❌');
-    
-    setPuzzleSolved(solved);
-    setPuzzleFailed(!solved);
-    
-    // Update ratings
-    if (currentPuzzle) {
-      await dispatch(updateRatingsAfterPuzzleAsync({ success: solved, userId: user?.id }));
+    if (solved) {
+      setPuzzleSolved(true);
+      setPuzzleFailed(false);
+    } else {
+      setPuzzleSolved(false);
+      setPuzzleFailed(true);
     }
+    
+    if (!currentPuzzle) return;
+    
+    try {
+      // Keep a minimal log about puzzle completion
+      if (process.env.NODE_ENV === 'development' && false) { // Disabled even in development
+        console.log(`🎯 [Complete] Puzzle ${solved ? 'solved' : 'failed'}: ${getPuzzleId(currentPuzzle) || 'unknown'}`);
+      }
+      
+      // Update ratings based on result
+      await dispatch(
+        updateRatingsAfterPuzzleAsync({
+          success: solved,
+          userId: user?.id
+        })
+      );
+      
+    } catch (error) {
+      console.error('❌ [Complete] Error updating ratings:', error);
+      setError('Failed to update ratings');
+    }
+  };
 
-    // Don't auto-transition, wait for user to click next
-    setIsTransitioning(false);
-    console.groupEnd();
+  const handlePuzzleReset = () => {
+    // Reset flag after the puzzle has been reset
+    setShouldResetPuzzle(false);
   };
 
   const handleNextPuzzle = async () => {
-    console.group('🔄 Next Puzzle');
-    setIsTransitioning(true);
-    transitionStartTime.current = Date.now();
-
-    try {
-      // Use precomputed puzzle if available
-      if (precomputedNextPuzzle) {
-        console.log('Using precomputed puzzle:', precomputedNextPuzzle.id);
-        setPreviousPuzzle(currentPuzzle as Puzzle);
-        dispatch(setCurrentPuzzle(precomputedNextPuzzle));
-        setPrecomputedNextPuzzle(null);
-      } else {
-        console.log('Loading new puzzle');
-        await loadNextPuzzle();
-      }
-
-      // Reset puzzle state
-      setPuzzleSolved(false);
-      setPuzzleFailed(false);
-      setIsTransitioning(false);
-    } catch (error) {
-      console.error('Error loading next puzzle:', error);
-      setError('Failed to load next puzzle');
-    }
-    console.groupEnd();
+    await loadNextPuzzle();
   };
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen pb-4 md:pb-8">
       <div className="flex-1 flex flex-col items-start overflow-auto min-w-0 relative">
-        {/* Show loading state on initial load */}
+        {/* Global loading state or error */}
         {isInitialLoad ? (
           <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
             <div className="text-gray-500 flex flex-col items-center gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <div>Loading puzzles...</div>
+              <div>{loadingMessage}</div>
             </div>
           </div>
         ) : (
           <>
-            <div ref={containerRef} className="w-full flex items-center justify-center relative px-2 md:px-4">
+            <div 
+              ref={containerRef} 
+              className="w-full flex items-center justify-center relative px-2 md:px-4"
+              style={{ minHeight: "300px" }} // Add minimum height to container
+            >
+              {/* Debug info removed for production */}
+              
               <div 
                 style={{ 
                   width: boardSize ? `${boardSize}px` : '100%', 
                   maxWidth: '100%',
                   opacity: isTransitioningBoard ? 0 : 1,
-                  transition: 'opacity 0.05s ease-in-out'
+                  transition: 'opacity 0.15s ease-in-out'
                 }} 
                 className="relative"
               >
-                {boardSize > 0 && currentPuzzle && (
-                  <Chessboard size={boardSize} onPuzzleComplete={handlePuzzleComplete} />
+                {boardSize > 0 && currentPuzzle ? (
+                  <ChessBoardWrapper 
+                    size={boardSize} 
+                    onPuzzleComplete={handlePuzzleComplete}
+                    containerRef={containerRef}
+                    shouldResetPuzzle={shouldResetPuzzle}
+                    onPuzzleReset={handlePuzzleReset}
+                  />
+                ) : currentPuzzle ? (
+                  // Fallback rendering when we have a puzzle but no valid board size yet
+                  <div className="w-full aspect-square bg-gray-100 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      <p className="text-gray-500">Preparing chessboard...</p>
+                      {/* Force a recalculation */}
+                      {setTimeout(() => calculateAndSetBoardSize(), 100) && null}
+                    </div>
+                  </div>
+                ) : boardSize > 0 ? (
+                  <div className="w-full aspect-square bg-yellow-50 flex items-center justify-center">
+                    <p className="text-gray-500">Board size calculated ({boardSize}px) but no puzzle loaded</p>
+                  </div>
+                ) : (
+                  <div className="w-full aspect-square bg-red-50 flex items-center justify-center">
+                    <p className="text-gray-500">Board size is zero or invalid: {boardSize}</p>
+                    {/* Force a recalculation */}
+                    {setTimeout(() => calculateAndSetBoardSize(), 100) && null}
+                  </div>
                 )}
-                {!currentPuzzle && !isInitialLoad && (
+                
+                {(!currentPuzzle || isLoading) && !isInitialLoad && (
                   <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      <div className="text-gray-500">{loadingMessage}</div>
+                    </div>
                   </div>
                 )}
-                {(puzzleSolved || puzzleFailed) && !isTransitioning && (
-                  <div className="flex justify-center mt-4 items-center gap-2">
-                    <button
-                      onClick={handleNextPuzzle}
-                      disabled={isLoadingPuzzle.current}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg font-medium shadow-md hover:shadow-lg transition-all"
-                    >
-                      {isLoadingPuzzle.current ? 'Loading...' : 'Next Puzzle'}
-                    </button>
-                    {puzzleSolved && (
-                      <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                    {puzzleFailed && (
-                      <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    )}
+                
+                {/* Error message */}
+                {error && (
+                  <div className="absolute inset-0 bg-red-100 bg-opacity-80 flex items-center justify-center rounded-lg">
+                    <div className="text-red-600 max-w-md p-4">
+                      <h3 className="font-bold text-lg mb-2">Error</h3>
+                      <p>{error}</p>
+                      <button 
+                        className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                        onClick={() => setError(null)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
                 )}
-                <div
-                  className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group hidden md:block"
-                  onMouseDown={handleMouseDown}
-                >
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 group-hover:bg-blue-400 transition-colors transform rotate-45" />
-                </div>
               </div>
+              
+              {puzzleSolved && (
+                <div className="absolute inset-0 bg-green-100 bg-opacity-80 flex items-center justify-center rounded-lg">
+                  <div className="text-green-700 max-w-md p-4 text-center">
+                    <h3 className="font-bold text-2xl mb-2">Correct!</h3>
+                    <p className="mb-4">Well done, you solved the puzzle.</p>
+                    <button 
+                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                      onClick={() => {
+                        setPuzzleSolved(false);
+                        loadNextPuzzle();
+                      }}
+                    >
+                      Next Puzzle
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {puzzleFailed && (
+                <div className="absolute inset-0 bg-red-100 bg-opacity-80 flex items-center justify-center rounded-lg">
+                  <div className="text-red-700 max-w-md p-4 text-center">
+                    <h3 className="font-bold text-2xl mb-2">Incorrect</h3>
+                    <p className="mb-4">That wasn't the correct move.</p>
+                    <div className="flex gap-2 justify-center">
+                      <button 
+                        className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+                        onClick={() => {
+                          setPuzzleFailed(false);
+                          setShouldResetPuzzle(true);
+                        }}
+                      >
+                        Try Again
+                      </button>
+                      <button 
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                        onClick={() => {
+                          setPuzzleFailed(false);
+                          loadNextPuzzle();
+                        }}
+                      >
+                        Next Puzzle
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="w-full px-2 md:px-4 mt-4">
+              <PuzzleInfo />
             </div>
           </>
         )}
-        {error && !currentPuzzle && (
-          <div className="w-full text-center mt-4">
-            <div className="inline-block p-2 text-sm text-gray-600 bg-gray-100 rounded">
-              {error}
-            </div>
-          </div>
-        )}
       </div>
-
-      <div className="mt-2 md:mt-0 md:ml-4 md:w-[520px] md:flex-shrink-0">
-        <div 
-          className="w-full overflow-y-auto max-h-[calc(100vh-8rem)] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent bg-white rounded-xl shadow-lg"
-        >
-          <div className="hidden md:block sticky top-0 bg-gray-50 z-10">
-            <PuzzleInfo />
+      
+      <div className="md:w-1/3 p-2 md:p-4 md:min-w-[300px] md:max-w-[400px]">
+        <h2 className="text-xl font-bold mb-4">Your Ratings</h2>
+        {userRatings?.loaded === false ? (
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+            <div className="h-24 bg-gray-200 rounded w-full mb-2"></div>
+            <div className="h-24 bg-gray-200 rounded w-full mb-2"></div>
           </div>
-          <div>
-            <CategoryRatings lastRatingUpdates={lastRatingUpdates} />
-          </div>
-          <div className="md:hidden bg-gray-50">
-            <PuzzleInfo />
-          </div>
-        </div>
+        ) : (
+          <CategoryRatings lastRatingUpdates={lastRatingUpdates || { categories: {} }} />
+        )}
       </div>
     </div>
   );

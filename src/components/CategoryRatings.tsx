@@ -5,7 +5,7 @@ import { categories } from '../data/categories';
 import { calculateAverageRating } from '../utils/ratings';
 import { CategoryCard } from './CategoryCard';
 
-export default function CategoryRatings({ lastRatingUpdates }: { lastRatingUpdates: any }) {
+export default function CategoryRatings({ lastRatingUpdates = { categories: {} } }: { lastRatingUpdates?: any }) {
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   
   // Show loading state until ratings are fully loaded
@@ -29,7 +29,7 @@ export default function CategoryRatings({ lastRatingUpdates }: { lastRatingUpdat
               ))}
             </div>
           </div>
-          <div className="border-l pl-1">
+          <div>
             <h3 className="text-xs font-medium text-orange-600 mb-1">Focus Areas</h3>
             <div className="space-y-1">
               {[...Array(5)].map((_, i) => (
@@ -52,7 +52,7 @@ export default function CategoryRatings({ lastRatingUpdates }: { lastRatingUpdat
 
   // Ensure categories is defined and not empty
   if (!categories || categories.length === 0) {
-    console.warn('No categories defined');
+    // console.warn('No categories defined');
     return null;
   }
 

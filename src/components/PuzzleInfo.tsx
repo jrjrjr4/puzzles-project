@@ -3,9 +3,13 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { getRatingConfidence } from '../utils/puzzles';
 import { themeToCategory } from '../data/categories';
+import { Puzzle } from '../types/puzzle';
 
 export default function PuzzleInfo() {
-  const puzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
+  const puzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle) as Puzzle & {
+    popularity?: number;
+    nbPlays?: number;
+  };
 
   if (!puzzle) {
     return null;
@@ -52,10 +56,12 @@ export default function PuzzleInfo() {
         <div className="min-w-[140px]">
           <div className="text-sm text-gray-500">Popularity</div>
           <div className="font-medium">
-            {puzzle.popularity}%
-            <span className="text-sm text-gray-500 ml-2">
-              ({puzzle.nbPlays.toLocaleString()} plays)
-            </span>
+            {typeof puzzle.popularity === 'number' ? `${puzzle.popularity}%` : 'N/A'}
+            {typeof puzzle.nbPlays === 'number' && (
+              <span className="text-sm text-gray-500 ml-2">
+                ({puzzle.nbPlays.toLocaleString()} plays)
+              </span>
+            )}
           </div>
         </div>
 

@@ -56,17 +56,23 @@ export function parsePuzzleCsv(csvContent: string): Puzzle[] {
           .filter((theme): theme is string => theme !== undefined)
       )];
 
+      // Safely parse numeric values
+      const parsedRating = parseInt(rating);
+      const parsedRatingDeviation = parseInt(ratingDeviation);
+      const parsedPopularity = popularity ? parseInt(popularity) : undefined;
+      const parsedNbPlays = nbPlays ? parseInt(nbPlays) : undefined;
+
       return {
         id,
         fen,
         moves: moves.split(' '),
-        rating: parseInt(rating),
-        ratingDeviation: parseInt(ratingDeviation),
-        popularity: parseInt(popularity),
-        nbPlays: parseInt(nbPlays),
+        rating: isNaN(parsedRating) ? 1500 : parsedRating,
+        ratingDeviation: isNaN(parsedRatingDeviation) ? 350 : parsedRatingDeviation,
+        ...(parsedPopularity && !isNaN(parsedPopularity) && { popularity: parsedPopularity }),
+        ...(parsedNbPlays && !isNaN(parsedNbPlays) && { nbPlays: parsedNbPlays }),
         themes,
-        gameUrl,
-        openingTags: openingTagsString ? openingTagsString.split(' ') : []
+        ...(gameUrl && { gameUrl }),
+        ...(openingTagsString && { openingTags: openingTagsString.split(' ') })
       };
     } catch (error) {
       console.error('Error parsing puzzle line:', line, error);

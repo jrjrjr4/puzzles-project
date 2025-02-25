@@ -39,21 +39,31 @@ const categoryIcons: Record<string, LucideIcon> = {
   'Master Game': Trophy
 };
 
+// Augmented RatingUpdate to handle different implementations
+interface AugmentedRatingUpdate {
+  oldRating?: number;
+  newRating: number;
+  oldRD?: number;
+  newRD: number;
+  change?: number;
+  attempts: number;
+}
+
 interface CategoryCardProps {
   category: CategoryRating & {
     ratingDeviation?: number;
   };
   averageRating: number;
-  lastRatingUpdates?: { categories: { [key: string]: RatingUpdate } };
+  lastRatingUpdates?: { categories: { [key: string]: AugmentedRatingUpdate } };
 }
 
 export function CategoryCard({ category, averageRating, lastRatingUpdates }: CategoryCardProps) {
   const Icon = categoryIcons[category.name] || Crosshair;
   const lastRatingUpdatesState = useSelector((state: RootState) => state.puzzle.lastRatingUpdates);
-  const ratingUpdate = lastRatingUpdatesState?.categories[category.name];
+  const ratingUpdate = lastRatingUpdatesState?.categories?.[category.name] as AugmentedRatingUpdate | undefined;
   const userRatings = useSelector((state: RootState) => state.puzzle.userRatings);
   const lastPuzzleIdForRatingUpdates = useSelector((state: RootState) => state.puzzle.lastPuzzleIdForRatingUpdates);
-  const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes);
+  const lastUpdatedThemes = useSelector((state: RootState) => state.puzzle.lastUpdatedThemes || []);
   const currentPuzzle = useSelector((state: RootState) => state.puzzle.currentPuzzle);
 
   // Show loading state if ratings aren't loaded yet
@@ -73,23 +83,27 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
 
   // If the rating is 0 or undefined, it means it hasn't been calculated yet
   const hasRating = category.rating !== undefined && category.rating > 0;
-  const wasRecentlyUpdated = lastUpdatedThemes.includes(category.name);
-  const showRatingUpdate = wasRecentlyUpdated && ratingUpdate && (currentPuzzle?.id === lastPuzzleIdForRatingUpdates);
-  const showYellowHighlight = wasRecentlyUpdated && ratingUpdate && (currentPuzzle?.id !== lastPuzzleIdForRatingUpdates);
+  
+  // Safely check for themes that were updated
+  const safeLastUpdatedThemes = Array.isArray(lastUpdatedThemes) ? lastUpdatedThemes : [];
+  const wasRecentlyUpdated = safeLastUpdatedThemes.includes(category.name);
+  
+  // Safe access to rating update data
+  const safeRatingUpdate = ratingUpdate || null;
+  const showRatingUpdate = wasRecentlyUpdated && safeRatingUpdate && 
+                          (currentPuzzle?.id === lastPuzzleIdForRatingUpdates);
+  const showYellowHighlight = wasRecentlyUpdated && safeRatingUpdate && 
+                             (currentPuzzle?.id !== lastPuzzleIdForRatingUpdates);
 
-  // Debug logs
-  console.log(`[CategoryCard ${category.name}] State:`, {
-    hasRating,
-    wasRecentlyUpdated,
-    showRatingUpdate,
-    showYellowHighlight,
-    ratingUpdate,
-    lastPuzzleIdForRatingUpdates,
-    currentPuzzleId: currentPuzzle?.id,
-    lastUpdatedThemes,
-  });
+  // Get old rating value (may be different depending on which RatingUpdate interface is used)
+  const getOldRating = (update: AugmentedRatingUpdate | null): number => {
+    if (!update) return 0;
+    // If oldRating is defined, use it, otherwise fall back to the category's current rating
+    return typeof update.oldRating !== 'undefined' ? update.oldRating : category.rating;
+  };
 
-  const update = lastRatingUpdates?.categories[category.name];
+  // Safely access the update from props
+  const update = lastRatingUpdates?.categories?.[category.name];
   const hasUpdate = !!update;
 
   return (
@@ -106,18 +120,18 @@ export function CategoryCard({ category, averageRating, lastRatingUpdates }: Cat
         <div className="flex items-center gap-2">
           {!hasRating ? (
             <div className="text-sm text-gray-500">Not rated</div>
-          ) : showRatingUpdate && ratingUpdate ? (
+          ) : showRatingUpdate && safeRatingUpdate ? (
             <div className="flex items-center gap-1">
               <div className="text-sm font-semibold text-blue-600">
-                {Math.round(ratingUpdate.oldRating)}
+                {Math.round(getOldRating(safeRatingUpdate))}
               </div>
               <div className="text-xs">→</div>
               <div className={`text-sm font-semibold ${
-                ratingUpdate.newRating > ratingUpdate.oldRating 
+                safeRatingUpdate.newRating > getOldRating(safeRatingUpdate) 
                   ? 'text-green-600' 
                   : 'text-red-600'
               }`}>
-                {Math.round(ratingUpdate.newRating)}
+                {Math.round(safeRatingUpdate.newRating)}
               </div>
             </div>
           ) : showYellowHighlight ? (

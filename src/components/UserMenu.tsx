@@ -23,18 +23,6 @@ export default function UserMenu() {
   const isGuest = user?.user_metadata?.is_guest;
   const dispatch = useDispatch<AppDispatch>();
 
-  // Debug current user state
-  useEffect(() => {
-    console.group('👤 Current User State');
-    console.log('User:', user ? {
-      id: user.id,
-      email: user.email,
-      isGuest: isGuest,
-      metadata: user.user_metadata
-    } : 'No user');
-    console.groupEnd();
-  }, [user, isGuest]);
-
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -48,36 +36,14 @@ export default function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debug modal state changes with more detail
-  useEffect(() => {
-    console.group('🔐 Auth Modal Debug');
-    console.log('Modal State:', {
-      showSignInModal,
-      showSwitchUserModal,
-      isSignUp,
-      isLoading,
-      modalRef: modalRef.current ? 'exists' : 'null'
-    });
-    console.groupEnd();
-  }, [showSignInModal, showSwitchUserModal, isSignUp, isLoading]);
-
   const handleSignOut = async () => {
-    console.group('🚪 Sign Out Process');
     try {
-      console.log('Current user before sign out:', user?.email, isGuest ? '(guest)' : '');
-      
-      // Sign out from Supabase
       await supabase.auth.signOut();
-      console.log('Successfully signed out from Supabase');
-
-      // Clear user state in Redux
       dispatch(authSlice.actions.setUser(null));
       dispatch(authSlice.actions.setError(null));
       
-      // Get existing guest session or create new one
       let guestSession = localStorage.getItem('guestSession');
       if (!guestSession) {
-        console.log('Creating new guest session...');
         const newGuestSession = {
           guestId: `guest_${Math.random().toString(36).substring(2, 15)}`,
           ratings: {
@@ -89,25 +55,16 @@ export default function UserMenu() {
         };
         localStorage.setItem('guestSession', JSON.stringify(newGuestSession));
         guestSession = JSON.stringify(newGuestSession);
-        console.log('New guest session created:', newGuestSession.guestId);
       } else {
-        console.log('Using existing guest session');
       }
 
-      // Close the menu
       setIsOpen(false);
-      console.log('Sign out process completed');
     } catch (error) {
-      console.error('❌ Error during sign out:', error);
     }
-    console.groupEnd();
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.group('🔐 Sign In Process');
-    console.log('Attempting to sign in with email:', email);
-    
     setError(null);
     setIsLoading(true);
 
@@ -119,58 +76,34 @@ export default function UserMenu() {
 
       if (error) throw error;
 
-      console.log('Sign in successful:', data.user?.email);
-      console.log('Previous guest session will be preserved');
-
-      // Close both modals
       setShowSignInModal(false);
       setShowSwitchUserModal(false);
       setIsOpen(false);
       setEmail('');
       setPassword('');
     } catch (error: any) {
-      console.error('❌ Sign in error:', error.message);
       setError(error.message);
     } finally {
       setIsLoading(false);
-      console.groupEnd();
     }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.group('📝 Sign Up Process');
-    
     setError(null);
     setIsLoading(true);
 
     try {
-      // Clean up the email by trimming whitespace and converting to lowercase
       const rawEmail = email;
       const cleanEmail = email.trim().toLowerCase();
       
-      // Debug email processing
-      console.log('Email validation debug:', {
-        rawEmail,
-        cleanEmail,
-        length: cleanEmail.length,
-        containsSpaces: cleanEmail.includes(' '),
-        characters: Array.from(cleanEmail).map(c => ({
-          char: c,
-          code: c.charCodeAt(0)
-        }))
-      });
-
       if (!cleanEmail) {
         throw new Error('Please enter your email address');
       }
 
-      // Supabase-specific email validation
-      // Only allow letters, numbers, and common email special characters
       const emailLocalPart = cleanEmail.split('@')[0];
       const emailDomain = cleanEmail.split('@')[1];
       
-      // Validate local part (before @)
       if (emailLocalPart.length < 3) {
         throw new Error('Email username must be at least 3 characters long');
       }
@@ -179,17 +112,9 @@ export default function UserMenu() {
         throw new Error('Email username can only contain letters, numbers, dots, hyphens and underscores, and must start and end with a letter or number');
       }
 
-      // Validate domain part (after @)
       if (!/^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/.test(emailDomain)) {
         throw new Error('Invalid email domain format');
       }
-
-      console.log('Email validation details:', {
-        localPart: emailLocalPart,
-        domain: emailDomain,
-        localValid: /^[a-z0-9][a-z0-9._-]*[a-z0-9]$/.test(emailLocalPart),
-        domainValid: /^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/.test(emailDomain)
-      });
 
       if (!password) {
         throw new Error('Please choose a password');
@@ -197,11 +122,6 @@ export default function UserMenu() {
       if (password.length < 6) {
         throw new Error('Password must be at least 6 characters long');
       }
-
-      console.log('Attempting Supabase signup with:', {
-        email: cleanEmail,
-        passwordLength: password.length
-      });
 
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -217,30 +137,17 @@ export default function UserMenu() {
       });
 
       if (error) {
-        console.error('Supabase signup error details:', {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-          stack: error.stack,
-          originalEmail: cleanEmail
-        });
-
-        // Handle specific Supabase error cases
         if (error.message.toLowerCase().includes('email') && error.message.toLowerCase().includes('invalid')) {
-          // Try signing in instead - the email might already be registered
-          console.log('Attempting sign in as fallback...');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email: cleanEmail,
             password
           });
 
           if (signInError) {
-            console.error('Sign in fallback failed:', signInError);
             throw new Error('This email address cannot be used. Please try a different email address or check if you already have an account.');
           }
 
           if (signInData?.user) {
-            console.log('Successfully signed in instead of signing up');
             setShowSignInModal(false);
             setEmail('');
             setPassword('');
@@ -248,7 +155,6 @@ export default function UserMenu() {
           }
         }
 
-        // If we get here, neither signup nor signin worked
         if (error.status === 400) {
           throw new Error('Unable to create account. Please try a different email address.');
         } else if (error.status === 422) {
@@ -261,34 +167,19 @@ export default function UserMenu() {
         throw new Error('This email is already registered. Please sign in instead.');
       }
 
-      console.log('Signup successful:', {
-        user: data?.user?.id,
-        email: data?.user?.email,
-        confirmationSent: true
-      });
-
       alert('Please check your email for the confirmation link to complete your registration!');
       setShowSignInModal(false);
       setEmail('');
       setPassword('');
     } catch (error: any) {
-      console.error('❌ Sign up error:', {
-        message: error.message,
-        type: typeof error,
-        isAuthError: error.name === 'AuthApiError',
-        fullError: error
-      });
       setError(error.message);
     } finally {
       setIsLoading(false);
-      console.groupEnd();
     }
   };
 
   const handleResetRatings = async () => {
-    console.group('🔄 Reset Ratings Process');
     try {
-      // Create default ratings with 1600 for all categories
       const defaultRating = { rating: 1600, ratingDeviation: 350 };
       const defaultCategories: Record<string, typeof defaultRating> = {};
       categories.forEach((c: { name: string }) => {
@@ -301,20 +192,16 @@ export default function UserMenu() {
         categories: defaultCategories
       };
 
-      // Update Redux state
       dispatch(loadUserRatings({ ratings: defaultRatings }));
 
       if (isGuest) {
-        // Update guest session in localStorage
         const guestSession = localStorage.getItem('guestSession');
         if (guestSession) {
           const session = JSON.parse(guestSession);
           session.ratings = defaultRatings;
           localStorage.setItem('guestSession', JSON.stringify(session));
-          console.log('💾 Successfully reset guest ratings');
         }
       } else if (user?.id) {
-        // Update ratings in Supabase for logged-in users
         const { error } = await supabase
           .from('user_ratings')
           .upsert({
@@ -327,35 +214,35 @@ export default function UserMenu() {
           console.error('❌ Error resetting ratings in Supabase:', error);
           throw error;
         }
-        console.log('✅ Successfully reset ratings in Supabase');
+        // console.log('✅ Successfully reset ratings in Supabase');
       }
 
       setIsOpen(false);
     } catch (error) {
       console.error('❌ Error resetting ratings:', error);
     }
-    console.groupEnd();
+    // console.groupEnd();
   };
 
   /**
    * Handles sign in with Google.
    */
   const handleGoogleSignIn = async (): Promise<void> => {
-    console.group('🔐 Google Sign In Process');
+    // console.group('🔐 Google Sign In Process');
     try {
       await dispatch(signInWithGoogle()).unwrap();
-      console.log('Google sign in successful');
+      // console.log('Google sign in successful');
       setShowSignInModal(false);
     } catch (error: any) {
       console.error('Google sign in failed:', error.message);
       setError(error.message);
     } finally {
-      console.groupEnd();
+      // console.groupEnd();
     }
   };
 
   const handleSwitchUser = async () => {
-    console.group('🔄 Switch User Process');
+    // console.group('🔄 Switch User Process');
     try {
       // Sign out from Supabase
       await supabase.auth.signOut();
@@ -368,23 +255,23 @@ export default function UserMenu() {
       
       // Close the switch user modal if it's open
       setShowSwitchUserModal(false);
-      console.log('User signed out successfully, ready to sign in again.');
+      // console.log('User signed out successfully, ready to sign in again.');
     } catch (error: any) {
       console.error('Error switching user:', error.message);
       dispatch(authSlice.actions.setError(error.message));
     } finally {
-      console.groupEnd();
+      // console.groupEnd();
     }
   };
 
   // Function to render auth modal content
   const renderAuthModalContent = () => {
-    console.group('🎨 Rendering Modal Content');
-    console.log('Modal State:', {
-      isSignUp,
-      showSignInModal,
-      showSwitchUserModal
-    });
+    // console.group('🎨 Rendering Modal Content');
+    // console.log('Modal State:', {
+    //   isSignUp,
+    //   showSignInModal,
+    //   showSwitchUserModal
+    // });
 
     const content = (
       <>
@@ -505,7 +392,7 @@ export default function UserMenu() {
       </>
     );
 
-    console.groupEnd();
+    // console.groupEnd();
     return content;
   };
 
@@ -609,7 +496,7 @@ export default function UserMenu() {
           <div ref={modalRef} className="bg-white rounded-lg p-6 w-full max-w-md relative">
             <button
               onClick={() => {
-                console.log('Closing auth modal');
+                // console.log('Closing auth modal');
                 setShowSignInModal(false);
                 setShowSwitchUserModal(false);
                 setError(null);

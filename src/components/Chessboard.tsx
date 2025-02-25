@@ -9,6 +9,8 @@ import { supabase } from '../utils/supabase';
 interface ChessboardProps {
   size?: number;
   onPuzzleComplete?: (solved: boolean) => void;
+  shouldResetPuzzle?: boolean;
+  onPuzzleReset?: () => void;
 }
 
 interface CustomSquareStyles {
@@ -40,7 +42,7 @@ const CAPTURE_MOVE_STYLE = {
   backgroundSize: '25% 25%'
 };
 
-export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardProps) {
+export default function Chessboard({ size = 600, onPuzzleComplete, shouldResetPuzzle, onPuzzleReset }: ChessboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
@@ -59,10 +61,10 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
   // Update game when puzzle changes and show opponent's first move with detailed debugging
   useEffect(() => {
     async function setupPuzzle() {
-      console.debug('setupPuzzle triggered', { timestamp: Date.now(), currentPuzzle });
+      // console.debug('setupPuzzle triggered', { timestamp: Date.now(), currentPuzzle });
       try {
         if (currentPuzzle?.fen && currentPuzzle.moves.length > 0) {
-          console.debug('setupPuzzle: Valid puzzle detected. Starting setup.');
+          // console.debug('setupPuzzle: Valid puzzle detected. Starting setup.');
 
           // Disable animations initially
           setTransitionDuration(0);
@@ -71,7 +73,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           // Reset the game with the puzzle position
           const newGame = new Chess();
           newGame.load(currentPuzzle.fen);
-          console.debug('setupPuzzle: Loaded puzzle FEN', { loadedFEN: newGame.fen() });
+          // console.debug('setupPuzzle: Loaded puzzle FEN', { loadedFEN: newGame.fen() });
 
           setGame(newGame);
           setCurrentMoveIndex(1);
@@ -85,7 +87,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
           const sideToMove = currentPuzzle.fen.split(' ')[1];
           const newOrientation = sideToMove === 'w' ? 'black' : 'white';
           setBoardOrientation(newOrientation);
-          console.debug('setupPuzzle: Board orientation set', { sideToMove, newOrientation });
+          // console.debug('setupPuzzle: Board orientation set', { sideToMove, newOrientation });
 
           // Make the first move (opponent's move)
           const firstMove = currentPuzzle.moves[0];
@@ -96,7 +98,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
             to: toSquare,
             promotion: firstMove[4] || 'q'
           });
-          console.debug('setupPuzzle: Opponent move made', { fromSquare, toSquare, postMoveFEN: newGame.fen() });
+          // console.debug('setupPuzzle: Opponent move made', { fromSquare, toSquare, postMoveFEN: newGame.fen() });
 
           // Update game state with the new position and highlight the move
           setGame(new Chess(newGame.fen()));
@@ -104,27 +106,75 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
             [fromSquare]: HIGHLIGHT_COLOR,
             [toSquare]: HIGHLIGHT_COLOR
           });
-          console.debug('setupPuzzle: Highlight set', { highlightedSquares: { [fromSquare]: HIGHLIGHT_COLOR, [toSquare]: HIGHLIGHT_COLOR } });
+          // console.debug('setupPuzzle: Highlight set', { highlightedSquares: { [fromSquare]: HIGHLIGHT_COLOR, [toSquare]: HIGHLIGHT_COLOR } });
 
           // Re-enable animations on next frame to avoid flash
           requestAnimationFrame(() => {
             setTransitionDuration(150);
             setIsAnimating(false);
-            console.debug('setupPuzzle: Animations re-enabled', { transitionDuration: 150, isAnimating: false });
+            // console.debug('setupPuzzle: Animations re-enabled', { transitionDuration: 150, isAnimating: false });
           });
         } else {
-          console.debug('setupPuzzle: Skipped setup due to invalid puzzle', { currentPuzzle });
+          // console.debug('setupPuzzle: Skipped setup due to invalid puzzle', { currentPuzzle });
         }
       } catch (error) {
         console.error('Error setting up puzzle:', error);
       } finally {
         setIsLoading(false);
-        console.debug('setupPuzzle: Final block executed', { isLoading: false });
+        // console.debug('setupPuzzle: Final block executed', { isLoading: false });
       }
     }
 
     setupPuzzle();
   }, [currentPuzzle]);
+
+  // Reset the puzzle to its initial state when shouldResetPuzzle changes to true
+  useEffect(() => {
+    if (shouldResetPuzzle && currentPuzzle) {
+      // console.debug('Resetting puzzle to initial state');
+      
+      // Disable animations initially
+      setTransitionDuration(0);
+      setIsAnimating(true);
+      
+      // Reset the game with the puzzle position
+      const newGame = new Chess();
+      newGame.load(currentPuzzle.fen);
+      
+      // Make the first move (opponent's move)
+      const firstMove = currentPuzzle.moves[0];
+      const fromSquare = firstMove.slice(0, 2);
+      const toSquare = firstMove.slice(2, 4);
+      newGame.move({
+        from: fromSquare,
+        to: toSquare,
+        promotion: firstMove[4] || 'q'
+      });
+      
+      // Update game state with the new position and highlight the move
+      setGame(new Chess(newGame.fen()));
+      setHighlightedSquares({
+        [fromSquare]: HIGHLIGHT_COLOR,
+        [toSquare]: HIGHLIGHT_COLOR
+      });
+      
+      // Reset move index to player's turn
+      setCurrentMoveIndex(1);
+      setSelectedSquare(null);
+      setLegalMoves({});
+      
+      // Re-enable animations
+      requestAnimationFrame(() => {
+        setTransitionDuration(150);
+        setIsAnimating(false);
+      });
+      
+      // Signal that reset is complete
+      if (onPuzzleReset) {
+        onPuzzleReset();
+      }
+    }
+  }, [shouldResetPuzzle, currentPuzzle, onPuzzleReset]);
 
   // Don't show anything until we have loaded the initial state
   if (isLoading && !currentPuzzle) {
@@ -185,7 +235,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
                 if (error) {
                   console.error('❌ Error saving ratings to Supabase:', error);
                 } else {
-                  console.log('✅ Successfully saved ratings to Supabase');
+                  // console.log('✅ Successfully saved ratings to Supabase');
                 }
               } catch (err) {
                 console.error('❌ Error saving to Supabase:', err);
@@ -238,7 +288,7 @@ export default function Chessboard({ size = 600, onPuzzleComplete }: ChessboardP
               if (error) {
                 console.error('❌ Error saving ratings to Supabase:', error);
               } else {
-                console.log('✅ Successfully saved ratings to Supabase');
+                // console.log('✅ Successfully saved ratings to Supabase');
               }
             } catch (err) {
               console.error('❌ Error saving to Supabase:', err);

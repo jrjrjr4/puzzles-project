@@ -4,11 +4,11 @@ export interface Puzzle {
   moves: string[];
   rating: number;
   ratingDeviation: number;
-  popularity: number;
-  nbPlays: number;
+  popularity?: number;
+  nbPlays?: number;
   themes: string[];
-  gameUrl: string;
-  openingTags: string[];
+  gameUrl?: string;
+  openingTags?: string[];
 }
 
 export interface PuzzleState {
