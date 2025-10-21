@@ -110,14 +110,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let subscription: any = null;
 
     const initializeAuth = async () => {
       try {
         dispatch(setLoading(true));
-        
+
         // Try to get existing session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
           throw sessionError;
         }
@@ -134,30 +135,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setupGuestSession(dispatch);
       } finally {
         if (mounted) {
-          authStateChangeEnabled.current = true;
           dispatch(setLoading(false));
+          // Enable auth state change listener AFTER initialization completes
+          authStateChangeEnabled.current = true;
         }
       }
     };
 
-    // Initialize auth immediately
-    initializeAuth();
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Set up auth state change listener BEFORE initialization
+    // This ensures we catch any auth events that happen during or after init
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only process events after initialization is complete
       if (!authStateChangeEnabled.current) return;
+
+      console.log('Auth state change:', event);
 
       if (event === 'SIGNED_IN' && session?.user) {
         dispatch(setUser(session.user));
         await loadRatings(session);
       } else if (event === 'SIGNED_OUT') {
         await setupGuestSession(dispatch);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        dispatch(setUser(session.user));
       }
     });
 
+    subscription = authListener.subscription;
+
+    // Initialize auth after setting up listener
+    initializeAuth();
+
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [dispatch]);
 

@@ -62,33 +62,10 @@ export function Auth() {
   const handleGuestLogin = async () => {
     try {
       setLoading(true);
-      
-      // Generate a unique guest ID
-      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      
-      // Create default ratings for the guest
-      const defaultRatings = {
-        loaded: true,
-        overall: { rating: 1600, ratingDeviation: 350 },
-        categories: {}
-      };
 
-      // Store guest data in localStorage
-      localStorage.setItem('guestCredentials', JSON.stringify({
-        id: guestId,
-        isGuest: true
-      }));
-      
-      // Store initial ratings
-      localStorage.setItem(`guest_ratings_${guestId}`, JSON.stringify(defaultRatings));
-      
-      // Dispatch the guest user to Redux
-      dispatch(setUser({
-        id: guestId,
-        user_metadata: { is_guest: true },
-        email: null,
-        role: 'guest'
-      } as any));
+      // Guest session is already set up by AuthProvider
+      // Just close the auth modal (user is already logged in as guest)
+      // This button is only shown if user somehow isn't logged in yet
 
     } catch (error) {
       dispatch(setError((error as Error).message));
